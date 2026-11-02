@@ -10,8 +10,8 @@
 namespace hui
 {
 
-// Raw DualSense state as the platform reads it (button bits follow the
-// scePad layout used by ProsperoLight).
+// Raw pad state as the platform reads it (button bits follow the scePad
+// layout used by the controller API).
 namespace pad_bits
 {
 constexpr std::uint32_t kL3 = 0x00000002;

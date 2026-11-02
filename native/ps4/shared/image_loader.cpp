@@ -4,10 +4,6 @@
 #include "image_loader.hpp"
 #include "thread_name.hpp"
 #include "network.hpp"
-#ifdef PROSPERO
-#include "app_config.hpp"
-#endif
-#if !defined(PROSPERO) || PS4_REACT_NETWORKING
 #include <curl/curl.h>
 #include <algorithm>
 #include <array>
@@ -1073,23 +1069,3 @@ std::string stats() {
   return out;
 }
 } // namespace images
-#else
-namespace images {
-bool start(const std::string&) { return false; }
-void stop(void (*)(std::uint32_t)) {}
-void discard(std::uint32_t, const std::string&) {}
-std::uint32_t load(const std::string& url, int, int, Fit, bool, Result&, std::string& error) {
-  error = "Image.load " + url + ": enable networking: true and filesystemAccess: console in app.json"; return 0;
-}
-void release(std::uint32_t, bool) {}
-void warm(std::vector<std::string>) {}
-std::vector<Result> poll(void (*)(std::uint32_t)) { return {}; }
-bool evict_unused(std::uint32_t, void (*)(std::uint32_t)) { return false; }
-Memory memory() { return {}; }
-void set_cache_bytes(std::size_t) {}
-void hold_memory(bool) {}
-void set_heap_probe(Heap (*)()) {}
-void defer(int) {}
-std::string stats() { return {}; }
-} // namespace images
-#endif

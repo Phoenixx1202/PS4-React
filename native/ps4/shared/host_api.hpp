@@ -1,7 +1,7 @@
 // Copyright (C) 2026 half144 and PS5 React contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Additional attribution term: see LICENSE-ATTRIBUTION.
-// Native API contract (ABI v8) between the hosts and `@ps5-react/core`. The input actions hosts
+// Native API contract (ABI v8) between the hosts and `@ps4-react/core`. The input actions hosts
 // pass to `__ps4ReactDispatch` are a separate contract with its own version (runtime/js/input.js).
 //
 // host_api.cpp (shared) installs `globalThis.__ps4ReactNative` through
@@ -11,7 +11,7 @@
 // render thread; the functions are synchronous and must return quickly.
 //
 // JavaScript shape (runtime/js/native.js wraps it):
-//   platform                       'ps5' | 'desktop'
+//   platform                       'ps4' | 'desktop'
 //   fs.readDir(path)               [{name, isDirectory, isFile, size, modified, device, inode}]
 //   fs.stat(path)                  {name, isDirectory, isFile, size, modified, device, inode} | null
 //                                  device/inode are decimal strings, preserving 64-bit IDs
@@ -55,17 +55,10 @@
 //                                  a decoder-memory refusal its headers so far justify; partial files ok
 //   archives.cancel(id)            requests cancellation; source volumes remain intact
 //   archives.poll()                state/error/written/entries/artifacts; consumes terminal results
-//   browser.capture(prefix, suffix, timeoutSeconds) ABI v7; Vikingfile capture task bound to a filename, or to any file when suffix is "/"
-//   browser.cancel(id)            stops the read-only payload by closing its connection
-//   browser.poll()                state/error/url; consumes terminal results
-//   payloads.launch(service)       async launch of stream/download/dpi bundled services; task ID
-//   payloads.poll()                state/error; consumes terminal transmission results
-//   payloads.cancel(id)            discards result; does not kill a resident service
-//   payloads.nonce()               256-bit OS-random hex capability, never persisted
-//   packages.install(path, name)   task ID; installs a .pkg under /data, /mnt/usb or /mnt/ext through the
-//                                  console's install service (PS5 only, needs the payload loader on 9021)
+//   packages.install(path, name)   task ID; installs a .pkg under /data, /mnt/usb or /mnt/ext through
+//                                  sceAppInstUtil
 //   packages.cancel(id)            stops reporting; an install the console accepted carries on
-//   packages.poll()                state/error/contentId/status/written/total; consumes terminal results
+//   packages.poll()                state/error/titleId/status/written/total; consumes terminal results
 //   network.version()              transport version string
 //   image.load(url, width, height, fit, prefetch) {id, state, name, width, height, error, color}; takes a
 //                                  reference; fit: 0 cover, 1 contain, 2 stretch, 3 none; prefetch
@@ -84,7 +77,7 @@
 //                                  shaping); defaults to the system language
 //   exit(relaunch)                 asks the host to close after this frame; with relaunch true it
 //                                  opens the app again once closed and returns true, or the reason
-//                                  it cannot (PS5: needs the payload loader on 127.0.0.1:9021)
+//                                  it cannot (relaunch is not implemented on PS4 yet)
 // Failures throw a JS Error whose message names the call, the path, and strerror.
 #pragma once
 
@@ -94,6 +87,10 @@
 
 namespace hui::audio {
 class Mixer;
+}
+
+namespace ps4 {
+class Pad;
 }
 
 extern "C" {
@@ -123,7 +120,7 @@ inline constexpr const char* kButtonNames[] = {
 };
 void ps4_react_set_gamepad(const GamepadState& state);
 
-// Per platform (native/ps5/host_platform.cpp, native/desktop/host_platform.cpp).
+// Per platform (native/ps4/host_platform.cpp).
 namespace host {
 const char* platform_name();
 // Maps an app path (/app0, /download0, /temp0, ...) to a real path. False rejects it.
@@ -141,7 +138,7 @@ int list_mounts(MountEntry* mounts, int max);
 bool read_dir(const char* real_path, void (*visit)(const char* name, void* user), void* user);
 // Total and free bytes of the filesystem holding real_path; false with errno set.
 bool disk_usage(const char* real_path, double& total, double& free);
-// Records the first use of each native call (PS5: kernel log), to locate native faults.
+// Records the first use of each native call (PS4: react.log), to locate native faults.
 void trace(const char* call);
 // The native call running on the render thread, or nullptr: the stall watchdog names it.
 extern std::atomic<const char*> current_call;
@@ -150,8 +147,8 @@ struct CallScope {
   explicit CallScope(const char* name) : outer(current_call.exchange(name)) {}
   ~CallScope() { current_call = outer; }
 };
-// Opens the app again once it has closed: PS5 sends relauncher.elf to the payload loader, the desktop
-// preview runs itself again. False with a reason in `error` (at most `size` bytes) when it cannot.
+// Opens the app again once it has closed. False with a reason in `error` (at most `size` bytes)
+// when the platform cannot arrange it; PS4 relaunch is not implemented yet.
 bool arrange_relaunch(char* error, std::size_t size);
 
 struct DeviceInfo {
@@ -176,13 +173,17 @@ int logged_in_users(User* users, int max);
 bool notify(const char* message, const char* sub_message);
 bool open_url(const char* url);
 
+// Binds the open controller for light-bar, vibration and per-frame services.
+void attach_pad(ps4::Pad* pad);
 void set_light_bar(std::uint8_t r, std::uint8_t g, std::uint8_t b);
 void reset_light_bar();
 void vibrate(float strength, float seconds);
 // While enabled, keeps the system from sleeping for inactivity; the app's last call wins.
 void keep_awake(bool enabled);
+// Stops timed vibration and calls sceSystemServicePowerTick while keep-awake is on.
+void tick();
 
-// Renders the mixer on an audio thread (PS5: sceAudioOut, desktop: SDL); false leaves the app silent.
+// Renders the mixer on an audio thread (PS4: sceAudioOut); false leaves the app silent.
 bool start_audio(hui::audio::Mixer& mixer);
 void stop_audio();
 } // namespace host
@@ -206,7 +207,3 @@ void ps4_react_stop_sound();
 JSValue ps4_react_archive_api(JSContext* ctx);
 // ABI v5 additive package installs: install(path, name), cancel(id), poll().
 JSValue ps4_react_package_api(JSContext* ctx);
-JSValue ps4_react_payload_api(JSContext* ctx);
-
-// ABI v7: filename-bound browser capture tasks (PS5 only).
-JSValue ps4_react_browser_capture_api(JSContext* ctx);

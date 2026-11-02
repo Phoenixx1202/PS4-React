@@ -4,10 +4,6 @@
 #include "network.hpp"
 #include "digest.hpp"
 #include "thread_name.hpp"
-#ifdef PROSPERO
-#include "app_config.hpp"
-#endif
-#if !defined(PROSPERO) || PS4_REACT_NETWORKING
 #include <curl/curl.h>
 #include <algorithm>
 #include <array>
@@ -36,7 +32,7 @@ constexpr std::size_t block_size = 128 * 1024, block_count = 128;
 constexpr unsigned max_connections = 64, max_jobs = 8, max_ranges = 65536;
 // The smallest part a range is split into: each split costs a request and closes the cut connection.
 constexpr std::uint64_t min_split = 1024 * 1024;
-// Two writers keep one large write going while the next batch is copied; more did not raise PS5 storage
+// Two writers keep one large write going while the next batch is copied; more did not raise console storage
 // throughput. Every buffer here comes out of the title's one heap (128 MiB at the least), shared with images and JS.
 constexpr unsigned writer_count = 2;
 static_assert(sizeof(off_t) >= 8, "Large downloads require 64-bit file offsets");
@@ -409,16 +405,10 @@ bool recover_file(Job& job) {
   return true;
 }
 
-// The PS5 libkernel gives titles no link(): its import binds to null and the first call faults.
-// Reporting ENOTSUP sends publication down the exclusive-reserve-and-rename path instead.
+// link() publishes the partial file atomically. A filesystem that refuses it
+// sends publication down the exclusive-reserve-and-rename path instead.
 int hard_link(const char* from, const char* to) {
-#ifdef PROSPERO
-  (void)from; (void)to;
-  errno = ENOTSUP;
-  return -1;
-#else
   return link(from, to);
-#endif
 }
 
 bool publish_file(Job& job) {
@@ -531,16 +521,6 @@ bool configure_transport(void* handle, const std::string& url, bool follow_redir
   // Neither console has an IPv6 route; without this an AAAA answer stalls the
   // connect before curl falls back to IPv4.
   set(CURLOPT_IPRESOLVE, static_cast<long>(CURL_IPRESOLVE_V4));
-#ifdef PROSPERO
-  set(CURLOPT_SOCKOPTFUNCTION, +[](void*, curl_socket_t fd, curlsocktype)->int {
-    int enabled = 1;
-    // The console's default receive window caps each connection far below the link on
-    // high-latency origins; 2 MiB matches what Spectrum requests. A refusal keeps the default.
-    int window = 2*1024*1024;
-    setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &window, sizeof window);
-    return setsockopt(fd, SOL_SOCKET, 0x1200, &enabled, sizeof enabled) == 0 ? CURL_SOCKOPT_OK : CURL_SOCKOPT_ERROR;
-  });
-#endif
   return ok;
 }
 
@@ -1218,7 +1198,7 @@ bool Service::prepare(Job& job) {
 }
 
 // Contiguous blocks of one transfer are joined into one write. Thousands of 128 KiB pwrites spread over
-// 64 ranges held PS5 storage near 30 MB/s however many writers ran; large sequential writes are far
+// 64 ranges held console storage near 30 MB/s however many writers ran; large sequential writes are far
 // faster. A writer without its staging buffer still works, one block per write.
 void Service::writer_loop() {
   constexpr std::size_t max_batch = 16;
@@ -1651,17 +1631,3 @@ std::vector<Snapshot> poll() { return service.poll(); }
 bool downloading() { return downloading_file; }
 const char* version() { return curl_version(); }
 } // namespace network
-#else
-namespace network {
-bool start() { return false; }
-void stop() {}
-std::uint32_t enqueue(Request, std::string& error) {
-  error = "enable networking: true and filesystemAccess: console in app.json"; return 0;
-}
-void cancel(std::uint32_t) {}
-std::vector<Snapshot> poll() { return {}; }
-bool downloading() { return false; }
-const char* version() { return "disabled"; }
-bool configure_transport(void*, const std::string&, bool) { return false; }
-} // namespace network
-#endif

@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cstdint>
+
 #include <orbis/Pad.h>
 
 namespace ps4 {
 
-// Minimal DualShock 4 reader for the PoC.
+// DualShock 4 reader for the runtime.
 class Pad {
 public:
     Pad() = default;
@@ -18,6 +20,11 @@ public:
     void close();
 
     bool is_open() const { return handle_ >= 0; }
+    int handle() const { return handle_; }
+
+    void set_light_bar(std::uint8_t r, std::uint8_t g, std::uint8_t b);
+    void reset_light_bar();
+    void set_vibration(std::uint8_t large, std::uint8_t small);
 
 private:
     int handle_ = -1;

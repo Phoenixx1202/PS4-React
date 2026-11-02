@@ -21,6 +21,57 @@ fi
 # The CMake toolchain file already sets the correct compiler flags.
 unset CFLAGS CXXFLAGS CPPFLAGS
 
+SAMPLE=""
+NO_PACKAGE=0
+DEV_SERVER=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --sample|-Sample)
+            SAMPLE="${2:-}"
+            [ -n "$SAMPLE" ] || { echo "--sample needs a name" >&2; exit 2; }
+            shift 2
+            ;;
+        --sample=*)
+            SAMPLE="${1#*=}"
+            shift
+            ;;
+        --no-package)
+            NO_PACKAGE=1
+            shift
+            ;;
+        --dev-server)
+            DEV_SERVER=1
+            shift
+            ;;
+        -h|--help)
+            echo "usage: $0 [--sample NAME] [--dev-server] [--no-package]"
+            exit 0
+            ;;
+        *)
+            echo "unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [ -n "$SAMPLE" ]; then
+    case "$SAMPLE" in
+        *[!A-Za-z0-9._-]*)
+            echo "invalid sample name: $SAMPLE" >&2
+            exit 2
+            ;;
+    esac
+    APP="$ROOT/samples/$SAMPLE"
+    OUTPUT_NAME="PS4-React-$SAMPLE.pkg"
+else
+    APP="$ROOT/app"
+    OUTPUT_NAME="PS4-React-Starter.pkg"
+fi
+if [ ! -f "$APP/app.json" ]; then
+    echo "app.json not found: $APP/app.json" >&2
+    exit 2
+fi
+
 LOCK="$ROOT/dependencies.lock.json"
 DEPS="$ROOT/.deps"
 ER="$DEPS/embeddedReact"
@@ -29,7 +80,6 @@ HB_SRC="$DEPS/harfbuzz-src"
 HB_BUILD="$ROOT/.build/harfbuzz"
 GEN="$ROOT/.build/react"
 BUILD="$ROOT/build"
-APP="$ROOT/app"
 
 read -r ER_URL ER_REV QJS_URL QJS_TAG HB_URL HB_SHA <<EOF
 $(python3 - "$LOCK" <<'PY'
@@ -89,9 +139,22 @@ if [ ! -f "$HB_BUILD/libharfbuzz.a" ] || [ ! -f "$HB_BUILD/libharfbuzz-raster.a"
     cmake --build "$HB_BUILD" --parallel "$(nproc)" --target harfbuzz harfbuzz-raster
 fi
 
+python3 "$ROOT/tools/check_app_config.py" "$APP/app.json"
+APP_META=$(python3 - "$APP/app.json" <<'PY'
+import json, sys
+app = json.load(open(sys.argv[1], encoding='utf-8'))
+print('\x1f'.join((app['titleId'], app['contentId'], app['name'], app['version'])))
+PY
+)
+IFS=$'\x1f' read -r TITLE_ID CONTENT_ID TITLE VERSION <<< "$APP_META"
+
 rm -rf "$GEN"
 mkdir -p "$GEN/app"
 cp -a "$APP/." "$GEN/app/"
+if [ -n "$SAMPLE" ] && [ -d "$ROOT/samples/assets" ]; then
+    mkdir -p "$GEN/assets"
+    cp -a "$ROOT/samples/assets/." "$GEN/assets/"
+fi
 if [ ! -f "$GEN/app/index.jsx" ]; then
     if [ -f "$GEN/app/index.js" ]; then
         printf "import './index.js';\n" > "$GEN/app/index.jsx"
@@ -111,7 +174,9 @@ node "$ROOT/tools/ps4_bundle_assets.mjs" "$GEN/app" "$GEN/app.bundle.js"
 node "$ROOT/tools/bundle.mjs" "$ER" "$GEN/app" "$GEN"
 python3 "$ROOT/tools/embed_bundle.py" "$GEN/app.bundle.js" "$GEN/bundle.c"
 
-rm -rf "$BUILD"
+if [ "${PS4_REACT_KEEP_BUILD:-0}" != "1" ]; then
+    rm -rf "$BUILD"
+fi
 cmake -S "$ROOT" -B "$BUILD" \
     -DCMAKE_TOOLCHAIN_FILE="$OPENORBIS/cmake/ps4.cmake" \
     -DCMAKE_BUILD_TYPE=Release \
@@ -119,13 +184,17 @@ cmake -S "$ROOT" -B "$BUILD" \
     -DER_ROOT="$ER" \
     -DQUICKJS_ROOT="$QUICKJS" \
     -DHARFBUZZ_SRC="$HB_SRC/src" -DHARFBUZZ_LIB_DIR="$HB_BUILD" \
-    -DPS4_REACT_GENERATED_DIR="$GEN"
+    -DPS4_REACT_GENERATED_DIR="$GEN" \
+    -DPS4_REACT_DEV_SERVER="$([ "$DEV_SERVER" = "1" ] && echo ON || echo OFF)"
 cmake --build "$BUILD" --target ps4_react_starter_stage --parallel "$(nproc)"
 
-python3 "$ROOT/tools/package_ps4.py" "$BUILD/native/ps4/react" \
-    --app-dir "$BUILD/app-react" \
-    --title-id CUSA99059 \
-    --content-id UP0001-CUSA99059_00-PS4REACTSTARTER0 \
-    --title "PS4 React Starter" \
-    --assets "$ROOT/assets" \
-    --output "$BUILD/PS4-React-Starter.pkg"
+if [ "$NO_PACKAGE" = "0" ]; then
+    python3 "$ROOT/tools/package_ps4.py" "$BUILD/native/ps4/react" \
+        --app-dir "$BUILD/app-react" \
+        --title-id "$TITLE_ID" \
+        --content-id "$CONTENT_ID" \
+        --title "$TITLE" \
+        --version "$VERSION" \
+        --assets "$ROOT/assets" \
+        --output "$BUILD/$OUTPUT_NAME"
+fi

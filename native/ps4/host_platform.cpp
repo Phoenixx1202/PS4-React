@@ -1,12 +1,13 @@
 // PS4 host services for the React runtime.
 //
 // This is the small platform surface host_api.hpp needs. Networking, archives,
-// package installs and audio are deliberately stubbed for the first React
-// build; the UI, filesystem, users, notifications and controller work.
+// images, audio, filesystem, users, notifications, package installs and
+// controller input are implemented.
 
 #include "audio_out.hpp"
 #include "host_api.hpp"
 #include "directory_records.hpp"
+#include "pad.hpp"
 #include "storage_stats.hpp"
 #include "system.hpp"
 
@@ -30,6 +31,9 @@ constexpr const char* kTempRoot = "/data/PS4React/tmp";
 constexpr const char* kCacheRoot = "/data/PS4React/cache";
 
 ps4::AudioOut audio_out;
+ps4::Pad* active_pad = nullptr;
+std::int64_t vibrate_until_us = 0;
+bool keep_awake_enabled = false;
 
 bool failed(int result) {
     if (result >= 0) return false;
@@ -163,15 +167,53 @@ bool notify(const char* message, const char* sub_message) {
     return sceKernelSendNotificationRequest(0, &request, sizeof request, 0) == 0;
 }
 
-bool open_url(const char*) {
-    // Not used by the starter; the PS4 browser launcher has a different ABI.
-    return false;
+bool open_url(const char* url) {
+    if (!url || !*url) return false;
+    // The OpenOrbis header omits the URL parameter; the system entry point takes it.
+    using LaunchBrowser = void (*)(const char*);
+    reinterpret_cast<LaunchBrowser>(sceSystemServiceLaunchWebBrowser)(url);
+    return true;
 }
 
-void set_light_bar(std::uint8_t, std::uint8_t, std::uint8_t) {}
-void reset_light_bar() {}
-void vibrate(float, float) {}
-void keep_awake(bool) {}
+void attach_pad(ps4::Pad* pad) {
+    active_pad = pad;
+}
+
+void set_light_bar(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
+    if (active_pad) active_pad->set_light_bar(r, g, b);
+}
+
+void reset_light_bar() {
+    if (active_pad) active_pad->reset_light_bar();
+}
+
+void vibrate(float strength, float seconds) {
+    if (!active_pad) return;
+    if (strength <= 0 || seconds <= 0) {
+        active_pad->set_vibration(0, 0);
+        vibrate_until_us = 0;
+        return;
+    }
+    const auto level = static_cast<std::uint8_t>(
+        (strength > 1 ? 1 : strength) * 255);
+    active_pad->set_vibration(level, level);
+    vibrate_until_us = ps4::system::monotonic_us() +
+        static_cast<std::int64_t>(seconds * 1000000);
+}
+
+void keep_awake(bool enabled) {
+    keep_awake_enabled = enabled;
+}
+
+void tick() {
+    if (active_pad && vibrate_until_us &&
+        ps4::system::monotonic_us() >= vibrate_until_us) {
+        active_pad->set_vibration(0, 0);
+        vibrate_until_us = 0;
+    }
+    if (keep_awake_enabled)
+        sceSystemServicePowerTick();
+}
 
 bool start_audio(hui::audio::Mixer& mixer) { return audio_out.start(mixer); }
 void stop_audio() { audio_out.stop(); }

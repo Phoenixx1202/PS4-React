@@ -27,6 +27,10 @@ extern "C" {
 #include "software_backend.h"
 }
 
+#if defined(PS4_REACT_DEV_SERVER)
+#include "dev_server.hpp"
+#endif
+
 extern "C" const char app_bundle[];
 extern "C" const unsigned long app_bundle_length;
 
@@ -64,6 +68,9 @@ constexpr std::pair<hui::Action, HostAction> kExtraActions[] = {
     {hui::Action::jump_next, HostAction::r2},
     {hui::Action::north, HostAction::triangle},
     {hui::Action::west, HostAction::square},
+    {hui::Action::l3, HostAction::l3},
+    {hui::Action::r3, HostAction::r3},
+    {hui::Action::touch, HostAction::touchpad},
 };
 
 const char* nav_action(hui::Direction direction) {
@@ -152,6 +159,7 @@ int main() {
 
     Pad pad;
     const bool have_pad = pad.open();
+    if (have_pad) host::attach_pad(&pad);
     ps4::system::log("PS4 React Starter: pad=%s", have_pad ? "yes" : "no");
 
     const bool have_audio = ps4_react_start_sound();
@@ -159,6 +167,12 @@ int main() {
 
     const bool have_network = network::start();
     ps4::system::log("PS4 React Starter: network=%s", have_network ? "yes" : "no");
+
+#if defined(PS4_REACT_DEV_SERVER)
+    dev::Server dev_server;
+    if (!dev_server.start())
+        ps4::system::log("PS4 React Starter: dev server unavailable");
+#endif
 
     const bool have_images = ps4_react_start_images();
     ps4::system::log("PS4 React Starter: images=%s", have_images ? "yes" : "no");
@@ -192,14 +206,25 @@ int main() {
     else
         ps4::system::log("PS4 React Starter: font directory not resolved");
 
+    // Keep the last error on screen instead of exiting to a black screen. The
+    // overlay is precompiled Embedded React bytecode and works after a failed
+    // bundle load; parking keeps it visible until the user closes the title.
+    const auto fatal = [&](const char* message) {
+        ps4::system::log("PS4 React Starter: %s", message);
+        if (er_runtime_context()) {
+            er_runtime_show_error();
+            er_commit();
+            if (const auto* pixels = er_software_framebuffer())
+                display.present(pixels, kWidth, kHeight);
+        }
+        ps4::system::sleep_us(3000000);
+        ps4::system::park();
+    };
+
     const bool loaded = er_runtime_load_source(app_bundle, app_bundle_length, "app.bundle.js");
     ps4::system::log("PS4 React Starter: bundle=%d error=%s", loaded ? 1 : 0,
                 er_runtime_last_error());
-    if (!loaded) {
-        // Keep the process alive long enough for the log to be read.
-        ps4::system::sleep_us(3000000);
-        ps4::system::park();
-    }
+    if (!loaded) fatal("bundle failed to load");
 
     hui::InputTracker tracker;
     OrbisPadData raw{};
@@ -210,6 +235,7 @@ int main() {
     unsigned total_frames = 0;
 
     for (;;) {
+        host::tick();
         const std::int64_t now = ps4::system::monotonic_us();
         hui::PadSample samples[1];
         std::size_t count = 0;
@@ -227,17 +253,36 @@ int main() {
         for (const auto& [button, action] : kExtraActions)
             if (input.is_pressed(button)) dispatch(action_name(action));
 
+#if defined(PS4_REACT_DEV_SERVER)
+        const std::uint8_t* reload = nullptr;
+        std::size_t reload_size = 0;
+        if (dev_server.poll(reload, reload_size)) {
+            bool applied = er_runtime_reset();
+            if (applied) {
+                er_register_assets();
+                applied = er_runtime_load_source(
+                    reinterpret_cast<const char*>(reload), reload_size, "dev.bundle.js");
+            }
+            if (applied) {
+                ps4::system::log("PS4 React Starter: hot reload ok (%zu bytes)", reload_size);
+            } else {
+                ps4::system::log("PS4 React Starter: hot reload failed: %s",
+                                 er_runtime_last_error());
+                er_runtime_show_error();
+            }
+            dev_server.ack(applied);
+        }
+#endif
+
         er_runtime_pump();
         const double elapsed_ms = std::clamp(
             static_cast<double>(now - previous) / 1000.0, 1.0, 50.0);
-        if (!ps4_react_frame(er_runtime_context(), elapsed_ms)) {
-            ps4::system::log("PS4 React Starter: frame callback exception");
-            break;
-        }
+        if (!ps4_react_frame(er_runtime_context(), elapsed_ms))
+            fatal("frame callback exception");
         er_commit();
         if (*er_runtime_last_error()) {
             ps4::system::log("PS4 React Starter: commit error: %s", er_runtime_last_error());
-            break;
+            fatal("commit error");
         }
 
         if (!display.present(er_software_framebuffer(), kWidth, kHeight)) {
@@ -271,6 +316,7 @@ int main() {
     ps4_react_stop_images();
     network::stop();
     er_software_backend_destroy();
+    host::attach_pad(nullptr);
     display.close();
     pad.close();
     ps4::system::log("PS4 React Starter: loop ended after %u frames", total_frames);

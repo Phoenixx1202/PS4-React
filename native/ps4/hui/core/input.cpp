@@ -15,7 +15,7 @@ namespace
 // Analog triggers count as pressed past the midpoint (digital L2/R2 bits are
 // not verified on hardware yet).
 constexpr std::uint8_t kTriggerThreshold = 128;
-// ProsperoLight's digital stick threshold: an axis must leave 64..192.
+// The controller's digital stick threshold: an axis must leave 64..192.
 constexpr int kStickLow = 64;
 constexpr int kStickHigh = 192;
 

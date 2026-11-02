@@ -7,10 +7,14 @@
 
 // Input actions (input ABI v3): what hosts pass to globalThis.__ps4ReactDispatch and input scripts
 // accept. runtime/js/input.js names the same actions for JavaScript.
-enum class HostAction : unsigned char { up, down, left, right, confirm, back, l1, r1, l2, r2, triangle, square, options };
+enum class HostAction : unsigned char {
+  up, down, left, right, confirm, back, l1, r1, l2, r2, triangle, square, options,
+  l3, r3, touchpad,
+};
 
 inline constexpr const char* kActionNames[] = {
   "up", "down", "left", "right", "confirm", "back", "l1", "r1", "l2", "r2", "triangle", "square", "options",
+  "l3", "r3", "touchpad",
 };
 
 constexpr const char* action_name(HostAction action) { return kActionNames[static_cast<std::size_t>(action)]; }

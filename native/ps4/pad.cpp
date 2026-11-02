@@ -62,4 +62,23 @@ void Pad::close() {
     handle_ = -1;
 }
 
+void Pad::set_light_bar(std::uint8_t r, std::uint8_t g, std::uint8_t b) {
+    if (handle_ < 0)
+        return;
+    OrbisPadColor color{r, g, b, 0};
+    scePadSetLightBar(handle_, &color);
+}
+
+void Pad::reset_light_bar() {
+    if (handle_ >= 0)
+        scePadResetLightBar(handle_);
+}
+
+void Pad::set_vibration(std::uint8_t large, std::uint8_t small) {
+    if (handle_ < 0)
+        return;
+    const OrbisPadVibeParam vibration{large, small};
+    scePadSetVibration(handle_, &vibration);
+}
+
 } // namespace ps4

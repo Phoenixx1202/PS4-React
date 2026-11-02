@@ -8,7 +8,7 @@
 #include <cstring>
 
 namespace host {
-// FreeBSD 9 / PS5 getdents records: inode32, length16, type8, nameLength8.
+// FreeBSD 9 / PS4 getdents records: inode32, length16, type8, nameLength8.
 // Copy the header instead of dereferencing an unaligned or truncated dirent.
 inline bool visit_directory_records(const char* bytes, std::size_t size,
                                     void (*visit)(const char*, void*), void* user) {

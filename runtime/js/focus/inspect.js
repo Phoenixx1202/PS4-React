@@ -1,7 +1,7 @@
 // Copyright (C) 2026 half144 and PS5 React contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Additional attribution term: see LICENSE-ATTRIBUTION.
-// Development hooks the desktop host's control channel calls (tools/ps5_drive.py): the focusable
+// Development hooks the desktop host's control channel calls: the focusable
 // elements as text, and focus by key. Nodes do not know their rendered text, so it is read from the
 // React elements they were given, labels and titles included.
 import {screenRect} from './frames.js';

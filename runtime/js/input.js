@@ -21,7 +21,8 @@ globalThis.__ps4ReactDispatch = action => {
 
 /**
  * The host actions, as native/shared/actions.hpp names them.
- * @typedef {'l1' | 'r1' | 'l2' | 'r2' | 'triangle' | 'square' | 'options'} ButtonAction shoulders, triggers, Triangle, Square, Options
+ * @typedef {'l1' | 'r1' | 'l2' | 'r2' | 'triangle' | 'square' | 'options'
+ *   | 'l3' | 'r3' | 'touchpad'} ButtonAction shoulders, triggers, Triangle, Square, Options, stick clicks, touchpad
  * @typedef {'up' | 'down' | 'left' | 'right' | 'confirm' | 'back' | ButtonAction} Action
  */
 

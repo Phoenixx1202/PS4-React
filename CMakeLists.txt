@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-# PS4 React — OpenOrbis PoC.
+# PS4 React — React runtime for PS4 homebrew.
 #
 # Configure with the OpenOrbis/PacBrew CMake toolchain:
 #   cmake -S . -B build \

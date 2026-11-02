@@ -20,7 +20,7 @@ constexpr std::size_t kJsMemoryLimit = 64 * 1024 * 1024;
 
 // QuickJS collects cycles when its heap grows past a threshold, in whichever
 // allocation crosses it: a full mark-and-sweep of every live object (tens of
-// milliseconds on the PS5 for a store's catalog) inside the frame that handles a
+// milliseconds on the PS4 for a store's catalog) inside the frame that handles a
 // key press. This collects in idle frames instead (half a second after the last
 // input), once a third of the room before that threshold is garbage, so a burst
 // of input starts with at least two thirds of it.

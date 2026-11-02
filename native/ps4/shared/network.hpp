@@ -45,7 +45,7 @@ std::vector<Snapshot> poll();
 bool downloading();
 const char* version();
 // Applies the transport policy every request shares (protocols, redirects, TLS trust, timeouts,
-// identity encoding and the PS5 socket options) to a libcurl easy handle.
+// identity encoding) to a libcurl easy handle.
 bool configure_transport(void* curl, const std::string& url, bool follow_redirects);
 // Platform owns libSceNet lifecycle and the trust-store path; desktop uses defaults.
 bool platform_start(std::string& error);

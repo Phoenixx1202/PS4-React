@@ -6,7 +6,7 @@ namespace ps4::system {
 
 // Opens /data/PS4React/<name> (or /temp0 fallback) and mirrors log() there.
 // Call first, before any SDK call that could fault.
-void start_log(const char* name = "poc.log");
+void start_log(const char* name = "react.log");
 
 // Writes one line to stdout, the PS4 kernel log and the log file.
 void log(const char* format, ...) __attribute__((format(printf, 1, 2)));

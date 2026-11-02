@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, BrowserCapture, Downloads, FileSystem, Http, Power, Sound} from './native.js';
+import {acquireImage, Archives, Downloads, FileSystem, Http, Power, Sound} from './native.js';
 
 test('native network tasks deliver progress, release listeners and stop polling', async () => {
   let tick;
@@ -180,38 +180,6 @@ test('archive and download task IDs are isolated while sharing the polling timer
     assert.equal(download.snapshot.state, 'queued');
     networkSnapshots = [{id: 1, state: 'completed', written: 100}]; tick();
     assert.equal((await download.done).written, 100);
-  } finally {
-    globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
-    delete globalThis.__ps4ReactNative;
-  }
-});
-
-
-test('browser capture delivers only its result and cancellation rejects as AbortError', async () => {
-  const originalInterval = globalThis.setInterval, originalClear = globalThis.clearInterval;
-  let tick, snapshots = [], next = 1;
-  const calls = [], cancelled = [];
-  globalThis.setInterval = callback => { tick = callback; return 1; };
-  globalThis.clearInterval = () => {};
-  globalThis.__ps4ReactNative = {browser: {
-    capture: (...args) => { calls.push(args); return next++; },
-    poll: () => { const result = snapshots; snapshots = []; return result; },
-    cancel: id => cancelled.push(id),
-  }};
-  try {
-    const capture = BrowserCapture.capture({suffix: '/Game.pkg'});
-    assert.deepEqual(calls, [['https://vikingfile.com/d/', '/Game.pkg', 180]]);
-    const states = [];
-    const off = capture.subscribe(snapshot => states.push(snapshot.state));
-    snapshots = [{id: 1, state: 'capturing'}]; tick();
-    const url = 'https://vikingfile.com/d/Ab01234567/Game.pkg';
-    snapshots = [{id: 1, state: 'completed', url}]; tick();
-    assert.equal((await capture.done).url, url);
-    assert.deepEqual(states, ['queued', 'capturing', 'completed']); off();
-    const second = BrowserCapture.capture({suffix: '/Other.pkg', timeoutSeconds: 30});
-    second.cancel(); assert.deepEqual(cancelled, [2]);
-    snapshots = [{id: 2, state: 'cancelled'}]; tick();
-    await assert.rejects(second.done, {name: 'AbortError'});
   } finally {
     globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
     delete globalThis.__ps4ReactNative;

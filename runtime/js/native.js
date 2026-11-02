@@ -368,27 +368,19 @@ export const Archives = Object.freeze({
 });
 
 /**
- * PKG installation through the console's install service (not implemented on PS4 yet; it needs a payload loader on port
- * 9021). The task's snapshot carries `written`/`total` bytes, the console's install `status` and the
- * package's `contentId`; it completes once the title is playable. Cancelling stops reporting only.
+ * PKG installation through the console's install service (`sceAppInstUtil`).
+ * The task's snapshot carries `written`/`total` bytes, the console's install `status` and the
+ * package's `titleId`; it completes when the install service returns. Cancelling stops reporting
+ * only; an install the console accepted carries on.
  */
-export const Payloads = Object.freeze({
-  launch: service => networkTask(host().payloads.launch(service), "Payloads.launch", "", "payloads"),
-  nonce: () => host().payloads.nonce(),
-});
-
 export const Packages = Object.freeze({
   install({path, name = ''}) {
-    const id = host().packages.install(path, name);
+    const backend = host().packages;
+    if (typeof backend?.install !== 'function') {
+      throw new Error('Packages.install is not available on this host');
+    }
+    const id = backend.install(path, name);
     return networkTask(id, 'Packages.install', path, 'packages');
-  },
-});
-
-/** Read-only, filename-bound Vikingfile capture; no browser data is retained. */
-export const BrowserCapture = Object.freeze({
-  capture({prefix = 'https://vikingfile.com/d/', suffix, timeoutSeconds = 180}) {
-    const id = host().browser.capture(prefix, suffix, timeoutSeconds);
-    return networkTask(id, 'BrowserCapture.capture', '', 'browser');
   },
 });
 

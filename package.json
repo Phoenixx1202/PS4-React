@@ -1,0 +1,21 @@
+{
+  "name": "ps4-react",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "React + JSX runtime for PlayStation 4 homebrew.",
+  "license": "GPL-3.0-or-later",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node tools/test.mjs",
+    "test:runtime": "node tools/test.mjs runtime",
+    "test:tailwind": "node tools/test.mjs tailwind"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@babel/plugin-syntax-jsx": "7.29.7",
+    "react": "18.3.1"
+  }
+}

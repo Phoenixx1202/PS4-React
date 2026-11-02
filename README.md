@@ -9,7 +9,8 @@ React + JSX runtime for PlayStation 4 homebrew. It renders a real React tree
 through Embedded React, runs JavaScript on QuickJS and presents a 1920×1080
 framebuffer with `sceVideoOut` — no OpenGL or shader compilation.
 
-The build produces a single installable package: **`PS4-React-Starter.pkg`**.
+The default build produces a single installable package:
+**`PS4-React-Starter.pkg`**.
 
 ## Features
 
@@ -23,7 +24,9 @@ The build produces a single installable package: **`PS4-React-Starter.pkg`**.
 - **Runtime text shaping** for CJK, Arabic and Indic scripts with HarfBuzz and
   SheenBidi; apps package only the Noto fonts they use.
 - **Native filesystem** under `/app0`, `/data` and `/download0`.
+- **PKG installation** through `sceAppInstUtil` via `Packages.install`.
 - **PKG packaging** validated with `PkgTool.Core` and a load-image checker.
+- **Dev hot reload** over TCP when the build enables `-DPS4_REACT_DEV_SERVER=ON`.
 
 ## Requirements
 
@@ -50,6 +53,12 @@ patches and builds HarfBuzz for the PS4.
 .\tools\build_ps4.ps1
 ```
 
+On Linux, use the shell entry point:
+
+```bash
+./tools/build_ps4.sh
+```
+
 Output:
 
 ```text
@@ -57,7 +66,8 @@ build/PS4-React-Starter.pkg
 ```
 
 The command builds only that package. `-NoPackage` produces the ELF/SELF without
-packaging. The GitHub Actions workflow is
+packaging. `-DevServer` enables the TCP hot-reload receiver for local
+development. The GitHub Actions workflow is
 [`.github/workflows/build.yml`](.github/workflows/build.yml).
 
 ## Samples
@@ -69,8 +79,49 @@ packaging. The GitHub Actions workflow is
 # -> build/PS4-React-counter.pkg
 ```
 
+On Linux, build one sample with:
+
+```bash
+./tools/build_ps4.sh --sample counter
+```
+
+Build every sample into `samples-pkg/`:
+
+```powershell
+.\tools\build_samples.ps1
+```
+
+```bash
+./tools/build_samples.sh
+```
+
 Each sample's `app.json` supplies its title and Title ID. See
 [`samples/README.md`](samples/README.md) for the list and ideas.
+
+## Development and hot reload
+
+Install a development build on the console with the receiver enabled:
+
+```powershell
+.\tools\build_ps4.ps1 -DevServer
+```
+
+```bash
+./tools/build_ps4.sh --dev-server
+```
+
+Then, on the workstation, point the watcher at the console's IP:
+
+```bash
+node tools/dev_server.mjs --host 192.168.1.50
+# sample:
+node tools/dev_server.mjs --host 192.168.1.50 --sample counter
+```
+
+The console listens on TCP port 9001, validates each ERHR frame with CRC-32 and
+reloads the JavaScript bundle in the running title. Assets (images, fonts,
+sounds) are still compiled into the PKG; rebuild and reinstall when they
+change. The receiver is off in release builds.
 
 ## Install
 
@@ -91,6 +142,7 @@ The runtime log is written to `/data/PS4React/react.log` (fallback `/temp0`).
 | Circle | Back |
 | L1 / R1 | Previous / next page |
 | L2 / R2 | Previous / next section |
+| L3 / R3 / touchpad | Exposed as actions |
 | Options | Exit |
 
 ## Native APIs
@@ -101,11 +153,17 @@ JavaScript reaches the host through `@ps4-react/core`.
 |---|---|
 | `Http.request` | HTTP/HTTPS request with headers, method and abort signal |
 | `Downloads.enqueue` | Download to a file with ranges, resume and completion receipts |
-| `Images` / `<Image>` | Local baked assets and remote PNG/JPEG decoding |
+| `<Image>` | Local baked assets and remote PNG/JPEG decoding |
 | `Archives.extract` | ZIP, TAR and 7z extraction with a destination directory |
 | `Sound` | Play baked WAV clips with volume and pan |
-| `System` / `Users` / `Device` | Notifications, users and device information |
-| `fs` | Read, write, list, rename and inspect files |
+| `Notifications` / `Users` / `DeviceInfo` | Notifications, users and device information |
+| `FileSystem` | Read, write, list, rename and inspect files |
+| `Controller` / `useGamepad` | Light bar, vibration and pad state |
+| `Packages.install` | Install a PKG through `sceAppInstUtil` |
+| `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
+
+`Payloads` and `BrowserCapture` are not part of the PS4 runtime. Save data,
+IME/message dialogs and music streaming are not implemented yet.
 
 Paths:
 
@@ -143,8 +201,11 @@ Validated on PS4 hardware:
 Known limitations:
 
 - RAR/RAR5 extraction is not available yet; ZIP/TAR/7z are supported.
-- PKG installation and payload APIs are not implemented.
+- Save data, IME/message dialogs and music streaming are not implemented yet.
+- `Packages.install` uses `sceAppInstUtil` and still needs validation on the
+  firmware versions you target.
 - Runtime text shaping needs the app to package the Noto fonts it uses.
+- Hot reload only replaces JavaScript; asset changes require a new PKG.
 
 ## Licenses
 

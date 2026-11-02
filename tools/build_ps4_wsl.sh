@@ -8,6 +8,8 @@
 #   $3 project path (WSL path, normally /mnt/c/...)
 #   $4 ER_ROOT path (WSL path)
 #   $5 QUICKJS_ROOT path (WSL path)
+#   $6 app directory relative to the project (default: app)
+#   $7 enable the TCP hot-reload receiver (1) or not (0)
 set -euo pipefail
 
 ROOTFS="${1:-/opt/codex-pacbrew-rootfs/rootfs}"
@@ -15,6 +17,8 @@ JOBS="${2:-6}"
 PROJECT="${3:-/mnt/c/Port/PS4-React}"
 ER_ROOT="${4:-}"
 QUICKJS_ROOT="${5:-}"
+APP_RELATIVE="${6:-app}"
+DEV_SERVER="${7:-0}"
 OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
 
 if [ ! -d "$ROOTFS" ]; then
@@ -43,6 +47,7 @@ mountpoint -q "$ROOTFS/sys" || mount --rbind /sys "$ROOTFS/sys"
 chroot "$ROOTFS" /usr/bin/env OPENORBIS="$OPENORBIS" /bin/bash -lc "
     set -euo pipefail
     cd '$PROJECT'
+    python3 '$PROJECT/tools/check_app_config.py' '$PROJECT/$APP_RELATIVE/app.json'
     # Text shaping needs HarfBuzz 14.6 + its raster addon. The PacBrew rootfs
     # carries the pinned source under /workspace; build it once into .build.
     if [ ! -f '$PROJECT/.build/harfbuzz/libharfbuzz.a' ]; then
@@ -56,7 +61,7 @@ chroot "$ROOTFS" /usr/bin/env OPENORBIS="$OPENORBIS" /bin/bash -lc "
             -DHB_HAVE_CORETEXT=OFF -DHB_HAVE_DIRECTWRITE=OFF \
             -DHB_HAVE_UNISCRIBE=OFF -DHB_HAVE_GDI=OFF
         cmake --build '$PROJECT/.build/harfbuzz' --parallel '$JOBS' \
-            --target harfbuzz harfbuzz-raster
+            --target harfbuzz harfbuzz-raste
     fi
     rm -rf build
     cmake -S . -B build \
@@ -66,7 +71,8 @@ chroot "$ROOTFS" /usr/bin/env OPENORBIS="$OPENORBIS" /bin/bash -lc "
         -DER_ROOT='$ER_ROOT' \
         -DQUICKJS_ROOT='$QUICKJS_ROOT' \
         -DHARFBUZZ_LIB_DIR='$PROJECT/.build/harfbuzz' \
-        -DPS4_REACT_GENERATED_DIR='$PROJECT/.build/react'
+        -DPS4_REACT_GENERATED_DIR='$PROJECT/.build/react' \
+        -DPS4_REACT_DEV_SERVER='$([ "$DEV_SERVER" = "1" ] && echo ON || echo OFF)'
     cmake --build build --target ps4_react_starter_stage --parallel '$JOBS'
     echo
     echo 'Build complete:'

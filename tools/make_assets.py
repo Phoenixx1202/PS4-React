@@ -1,7 +1,7 @@
-"""Generate placeholder art for the PS4 React PoC PKG.
+"""Generate fallback PKG art for PS4 React.
 
 Run on a workstation with Pillow:
-    python tools/make_poc_assets.py
+    python tools/make_assets.py
 """
 
 from pathlib import Path
@@ -57,7 +57,7 @@ def icon() -> None:
     draw.rounded_rectangle((72, 120, 440, 392), radius=24, fill=(14, 20, 38))
     draw.text((104, 148), "PS4", font=font(132), fill=WHITE)
     draw.text((104, 286), "REACT", font=font(74), fill=CYAN)
-    draw.text((108, 372), "OpenOrbis PoC", font=font(26, bold=False), fill=MUTED)
+    draw.text((108, 372), "OpenOrbis", font=font(26, bold=False), fill=MUTED)
     image.save(ASSETS / "icon0.png", optimize=True)
     print(ASSETS / "icon0.png")
 
@@ -79,4 +79,4 @@ def splash(name: str, subtitle: str) -> None:
 if __name__ == "__main__":
     icon()
     splash("pic0.png", "A React UI runtime for PS4 homebrew")
-    splash("pic1.png", "Loading the PoC...")
+    splash("pic1.png", "Starting...")

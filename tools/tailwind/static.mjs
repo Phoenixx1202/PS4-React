@@ -80,7 +80,7 @@ export const REJECTED = [
     'underline-offset', 'text-wrap', 'antialiased', 'subpixel-antialiased', 'tabular-nums', 'ordinal',
     'object-scale-down', 'object-left', 'object-right', 'object-top', 'object-bottom', 'bg-fixed',
     'bg-cover', 'bg-contain', 'bg-center', 'bg-no-repeat', 'bg-repeat', 'bg-clip', 'bg-origin'],
-  'browser-only CSS; not supported by the PS5 renderer'),
+  'browser-only CSS; not supported by the PS4 renderer'),
   ...reject(['w-auto', 'h-auto', 'size-auto', 'basis-auto', 'z-auto', 'max-w-none', 'aspect-auto',
     'inset-auto', 'top-auto', 'right-auto', 'bottom-auto', 'left-auto'],
   'auto is already the default; remove the class'),

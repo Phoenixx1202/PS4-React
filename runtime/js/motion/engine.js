@@ -9,7 +9,7 @@ export const engine = {
     const value = new Animated.Value(initial);
     if (!value._handle) {
       throw new Error('motion: the engine Animated.Value pool is full; animate fewer keys or elements at once, '
-        + 'or raise ERUI_MAX_ANIM_VALUES in native/ps5/CMakeLists.txt');
+        + 'or raise ERUI_MAX_ANIM_VALUES in the Embedded React build');
     }
     return value;
   },

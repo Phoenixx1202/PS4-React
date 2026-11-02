@@ -14,6 +14,22 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample files
 ```
 
+On Linux:
+
+```bash
+./tools/build_ps4.sh --sample counter
+```
+
+Or build every sample into `samples-pkg/`:
+
+```powershell
+.\tools\build_samples.ps1
+```
+
+```bash
+./tools/build_samples.sh
+```
+
 The default build still packages `app/` as `PS4-React-Starter.pkg`:
 
 ```powershell
@@ -31,6 +47,9 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
 font sizes each app uses.
+
+The GitHub Actions build creates the starter and every sample, and attaches all
+of the PKGs to a release when a `v*` tag is pushed.
 
 ## More ideas
 

@@ -552,7 +552,7 @@ bool rar_volumes(const Request& request) {
     return std::any_of(rar_signatures.begin(), rar_signatures.end(), [&](std::string_view signature) { return bytes.starts_with(signature); });
   });
 }
-// Decoder threads: PS5 has 8 cores; the interface keeps two either way, and downloads (a streamed set's own
+// Decoder threads: PS4 has 8 cores; the interface keeps two either way, and downloads (a streamed set's own
 // included) two more.
 unsigned rar_threads(const Request& request) { return request.stream || downloading() ? 4 : 6; }
 std::string rar_request(const Request& request, const std::string& staging) {

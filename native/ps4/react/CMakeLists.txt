@@ -22,6 +22,8 @@ if(NOT EXISTS "${PS4_REACT_GENERATED_DIR}/sounds.generated.c")
         "Missing ${PS4_REACT_GENERATED_DIR}/sounds.generated.c. Run tools/bundle_react.ps1 first.")
 endif()
 
+option(PS4_REACT_DEV_SERVER "Enable the TCP hot-reload receiver" OFF)
+
 set(ER_BRIDGE_QUICKJS_SMOKE OFF CACHE BOOL "" FORCE)
 set(ER_BRIDGE_QUICKJS_RUNTEST OFF CACHE BOOL "" FORCE)
 set(ER_BRIDGE_QUICKJS_SPLITTEST OFF CACHE BOOL "" FORCE)
@@ -54,7 +56,7 @@ endif()
 add_executable(ps4_react_starter
     react_host.cpp
     ../host_platform.cpp
-    ../stubs.cpp
+    ../shared/package_api.cpp
     ../shared/text_shaper.cpp
     ../third_party/sheenbidi/Source/SheenBidi.c
     ../audio_out.cpp
@@ -83,6 +85,11 @@ add_executable(ps4_react_starter
     "${PS4_REACT_GENERATED_DIR}/sounds.generated.c"
     "${PS4_REACT_GENERATED_DIR}/bundle.c"
 )
+
+if(PS4_REACT_DEV_SERVER)
+    target_sources(ps4_react_starter PRIVATE ../dev_server.cpp)
+    target_compile_definitions(ps4_react_starter PRIVATE PS4_REACT_DEV_SERVER=1)
+endif()
 
 target_include_directories(ps4_react_starter PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/.."
@@ -123,6 +130,7 @@ target_link_libraries(ps4_react_starter PRIVATE
     er-software
     embedded-react
     SceSysmodule
+    SceAppInstUtil
     SceVideoOut
     ScePad
     SceAudioOut

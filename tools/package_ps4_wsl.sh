@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# Package the built PoC into a PS4 PKG inside the PacBrew rootfs.
+# Package a built PS4 React app into a PKG inside the PacBrew rootfs.
 #
 # Usage:
-#   tools/package_ps4_wsl.sh [rootfs] [project] [build-dir] [app-dir] [title-id] [content-id] [title] [output]
+#   tools/package_ps4_wsl.sh [rootfs] [project] [build-dir] [app-dir] [title-id] [content-id] [title] [output] [version]
 set -euo pipefail
 
 ROOTFS="${1:-/opt/codex-pacbrew-rootfs/rootfs}"
 PROJECT="${2:-/mnt/c/Port/PS4-React}"
 BUILD="${3:-$PROJECT/build/native/ps4}"
 APP="${4:-$PROJECT/build/app}"
-TITLE_ID="${5:-CUSA99053}"
-CONTENT_ID="${6:-UP0001-CUSA99053_00-PS4REACTPOC00000}"
-TITLE="${7:-PS4 React PoC}"
-OUTPUT="${8:-$PROJECT/build/PS4-React-PoC.pkg}"
+TITLE_ID="${5:-CUSA99059}"
+CONTENT_ID="${6:-UP0001-CUSA99059_00-PS4REACTSTARTER0}"
+TITLE="${7:-PS4 React Starter}"
+OUTPUT="${8:-$PROJECT/build/PS4-React-Starter.pkg}"
+VERSION="${9:-01.00}"
 OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
 
 mkdir -p "$ROOTFS/mnt/c" "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys"
@@ -31,5 +32,6 @@ chroot "$ROOTFS" /usr/bin/env OPENORBIS="$OPENORBIS" /bin/bash -lc "
         --title-id '$TITLE_ID' \
         --content-id '$CONTENT_ID' \
         --title '$TITLE' \
+        --version '$VERSION' \
         --output '$OUTPUT'
 "

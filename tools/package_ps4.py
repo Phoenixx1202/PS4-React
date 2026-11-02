@@ -1,4 +1,4 @@
-"""Package the PS4 React PoC as an installable PS4 PKG.
+"""Package a PS4 React app as an installable PS4 PKG.
 
 Run inside the PacBrew rootfs (or any environment with OPENORBIS set):
 
@@ -6,8 +6,8 @@ Run inside the PacBrew rootfs (or any environment with OPENORBIS set):
       python3 tools/package_ps4.py build/native/ps4
 
 The output is a fake/free PKG for jailbroken consoles, made with the
-OpenOrbis/LibOrbisPkg toolchain. It is intentionally a placeholder title
-(CUSA99053) and should not reuse an ID already installed on the console.
+OpenOrbis/LibOrbisPkg toolchain. Pass the title and IDs from the app's
+``app.json``; the defaults describe the starter app.
 """
 
 from __future__ import annotations
@@ -35,9 +35,11 @@ def main() -> int:
                         help="directory containing eboot.bin (default: build/native/ps4)")
     parser.add_argument("--app-dir", default=None,
                         help="directory containing sce_module (default: <build>/../app)")
-    parser.add_argument("--title-id", default="CUSA99053")
-    parser.add_argument("--content-id", default="UP0001-CUSA99053_00-PS4REACTPOC00000")
-    parser.add_argument("--title", default="PS4 React PoC")
+    parser.add_argument("--title-id", default="CUSA99059")
+    parser.add_argument("--content-id", default="UP0001-CUSA99059_00-PS4REACTSTARTER0")
+    parser.add_argument("--title", default="PS4 React Starter")
+    parser.add_argument("--version", default="01.00",
+                        help="APP_VER/VERSION as MM.mm (default: 01.00)")
     parser.add_argument("--output", default=None)
     parser.add_argument("--assets", default=str(ROOT / "assets"))
     parser.add_argument("--keep-stage", action="store_true")
@@ -83,7 +85,7 @@ def main() -> int:
             if elf.is_file() and checker.is_file():
                 run(sys.executable, checker, elf, oelf)
 
-    output = Path(args.output).resolve() if args.output else build / "PS4-React-PoC.pkg"
+    output = Path(args.output).resolve() if args.output else build / "PS4-React-Starter.pkg"
     stage = build / "package"
     if stage.exists():
         shutil.rmtree(stage)
@@ -120,14 +122,21 @@ def main() -> int:
     if sfo.exists():
         sfo.unlink()
     run(tool, "sfo_new", sfo, env=env)
+    version_parts = args.version.split(".")
+    if (not version_parts or not version_parts[0].isdigit()
+            or (len(version_parts) > 1 and not version_parts[1].isdigit())):
+        print("version must look like MM.mm, for example 01.00.", file=sys.stderr)
+        return 2
+    version = f"{version_parts[0].zfill(2)[:2]}.{version_parts[1].zfill(2)[:2] if len(version_parts) > 1 else '00'}"
+
     strings = {
-        "APP_VER": ("00.01", 8),
+        "APP_VER": (version, 8),
         "CATEGORY": ("gde", 4),
         "FORMAT": ("obs", 4),
         "CONTENT_ID": (content_id, 48),
         "TITLE": (args.title, 128),
         "TITLE_ID": (title_id, 12),
-        "VERSION": ("00.01", 8),
+        "VERSION": (version, 8),
     }
     for key, (value, size) in strings.items():
         run(tool, "sfo_setentry", sfo, key, "--type", "Utf8",

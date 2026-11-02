@@ -27,6 +27,10 @@
     Build a sample from samples\<name> instead of app/. Its app.json supplies
     the title, Title ID, Content ID and output file name.
 
+.PARAMETER DevServer
+    Enable the TCP hot-reload receiver on port 9001 for tools/dev_server.mjs.
+    Leave it off for packages you plan to distribute.
+
 .PARAMETER NoPackage
     Build the ELF/SELF and launch folder; skip PkgTool.Core.
 #>
@@ -38,6 +42,7 @@ param(
     [string]$ErRoot = '',
     [string]$QuickJsRoot = '',
     [string]$Sample = '',
+    [switch]$DevServer,
     [switch]$NoPackage
 )
 
@@ -94,6 +99,7 @@ if (-not $AppConfig.titleId -or -not $AppConfig.contentId) {
 $TitleId = [string]$AppConfig.titleId
 $ContentId = [string]$AppConfig.contentId
 $Title = if ($AppConfig.name) { [string]$AppConfig.name } else { 'PS4 React' }
+$Version = if ($AppConfig.version) { [string]$AppConfig.version } else { '01.00' }
 $OutputName = if ($Sample) { "PS4-React-$Sample.pkg" } else { 'PS4-React-Starter.pkg' }
 
 $lock = Get-Content (Join-Path $ProjectPath 'dependencies.lock.json') -Raw |
@@ -132,7 +138,8 @@ if ($LASTEXITCODE -ne 0) { throw "React bundle failed ($LASTEXITCODE)" }
 Write-Host "Building $ProjectUnix in $Rootfs ($Distro, $Jobs jobs)..."
 Invoke-Native {
     wsl.exe -d $Distro --cd / -u root -- bash "$ProjectUnix/tools/build_ps4_wsl.sh" `
-        $Rootfs $Jobs $ProjectUnix $ErRootUnix $QuickJsUnix
+        $Rootfs $Jobs $ProjectUnix $ErRootUnix $QuickJsUnix $AppRelative `
+        $([int]$DevServer.IsPresent)
 } 'PS4 build'
 
 if (-not $NoPackage) {
@@ -144,7 +151,8 @@ if (-not $NoPackage) {
             $TitleId `
             $ContentId `
             $Title `
-            "$ProjectUnix/build/$OutputName"
+            "$ProjectUnix/build/$OutputName" `
+            $Version
     } 'PS4 packaging'
 }
 

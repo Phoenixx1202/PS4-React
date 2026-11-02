@@ -52,4 +52,4 @@ function App() {
     </FocusScope>
   );
 }
-AppRegistry.registerComponent('overdrive-proof', () => App);
+AppRegistry.registerComponent('ps4-react-starter', () => App);
