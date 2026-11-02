@@ -194,8 +194,8 @@ void vibrate(float strength, float seconds) {
         vibrate_until_us = 0;
         return;
     }
-    const auto level = static_cast<std::uint8_t>(
-        (strength > 1 ? 1 : strength) * 255);
+    const float amount = strength < 0 ? 0 : strength > 1 ? 1 : strength;
+    const auto level = static_cast<std::uint8_t>(amount * 255);
     active_pad->set_vibration(level, level);
     vibrate_until_us = ps4::system::monotonic_us() +
         static_cast<std::int64_t>(seconds * 1000000);

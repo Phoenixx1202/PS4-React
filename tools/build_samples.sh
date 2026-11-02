@@ -10,7 +10,9 @@ rm -f "$OUTPUT"/*.pkg
 
 samples=()
 for dir in "$ROOT"/samples/*/; do
-    [ -f "$dir/app.json" ] && samples+=("$(basename "$dir")")
+    if [ -f "$dir/app.json" ]; then
+        samples+=("$(basename "$dir")")
+    fi
 done
 if [ "${#samples[@]}" -eq 0 ]; then
     echo "no samples found under $ROOT/samples" >&2
