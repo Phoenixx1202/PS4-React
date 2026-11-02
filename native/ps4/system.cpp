@@ -1,0 +1,140 @@
+#include "system.hpp"
+
+#include <orbis/Sysmodule.h>
+#include <orbis/SystemService.h>
+#include <orbis/UserService.h>
+#include <orbis/libkernel.h>
+
+#include <cstdarg>
+#include <cstddef>
+#include <cstdio>
+#include <cstring>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+namespace ps4::system {
+namespace {
+
+int log_fd = -1;
+
+// Internal module IDs. Kept as literals so the file builds against older
+// OpenOrbis headers that do not define every enum member.
+constexpr std::uint32_t kSysCore = 0x80000004;
+constexpr std::uint32_t kIpmi = 0x8000001D;
+constexpr std::uint32_t kSystemService = 0x80000010;
+constexpr std::uint32_t kUserService = 0x80000011;
+constexpr std::uint32_t kPad = 0x80000024;
+constexpr std::uint32_t kAudioOut = 0x80000001;
+constexpr std::uint32_t kNet = 0x8000001C;
+constexpr std::uint32_t kNetCtl = 0x80000009;
+constexpr std::uint32_t kVideoOut = 0x80000022;
+
+} // namespace
+
+void start_log(const char* name) {
+    if (log_fd >= 0)
+        return;
+
+    mkdir("/data/PS4React", 0777);
+    char primary[256];
+    char fallback[256];
+    std::snprintf(primary, sizeof primary, "/data/PS4React/%s", name);
+    std::snprintf(fallback, sizeof fallback, "/temp0/%s", name);
+    const char* paths[] = {primary, fallback};
+    for (const char* path : paths) {
+        log_fd = ::open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (log_fd >= 0) {
+            log("log: writing %s", path);
+            return;
+        }
+    }
+    log("log: no writable log file; klog only");
+}
+
+void log(const char* format, ...) {
+    char line[512];
+    va_list arguments;
+    va_start(arguments, format);
+    std::vsnprintf(line, sizeof line, format, arguments);
+    va_end(arguments);
+
+    // The kernel log accepts a format string; pass the line as data.
+    sceKernelDebugOutText(0, "%s", line);
+    std::fputs(line, stdout);
+    std::fputc('\n', stdout);
+    std::fflush(stdout);
+
+    if (log_fd >= 0) {
+        const std::size_t length = std::strlen(line);
+        (void)!::write(log_fd, line, length);
+        (void)!::write(log_fd, "\n", 1);
+    }
+}
+
+bool initialize_services() {
+    static bool initialized = false;
+    if (initialized)
+        return true;
+
+    const struct {
+        std::uint32_t id;
+        const char* name;
+    } modules[] = {
+        {kSysCore, "syscore"},
+        {kIpmi, "ipmi"},
+        {kSystemService, "system"},
+        {kUserService, "user"},
+        {kPad, "pad"},
+        {kAudioOut, "audio"},
+        {kNet, "net"},
+        {kNetCtl, "netctl"},
+        {kVideoOut, "videoout"},
+    };
+    // Rootfs OpenOrbis declares the parameter as enum OrbisSysModuleInternal;
+    // older headers use uint32_t. Both are the same 32-bit ABI here.
+    using LoadInternal = std::uint32_t (*)(std::uint32_t);
+    const auto load_internal =
+        reinterpret_cast<LoadInternal>(sceSysmoduleLoadModuleInternal);
+    for (const auto& module : modules) {
+        const int result = static_cast<int>(load_internal(module.id));
+        log("service: %s=0x%08x", module.name, static_cast<unsigned>(result));
+    }
+
+    OrbisUserServiceInitializeParams parameters{};
+    parameters.priority = ORBIS_KERNEL_PRIO_FIFO_LOWEST;
+    const int user = sceUserServiceInitialize(&parameters);
+    log("service: user init=0x%08x", static_cast<unsigned>(user));
+
+    initialized = true;
+    return true;
+}
+
+std::int64_t monotonic_us() {
+    return static_cast<std::int64_t>(sceKernelGetProcessTime());
+}
+
+void sleep_us(std::uint32_t microseconds) {
+    sceKernelUsleep(microseconds);
+}
+
+void hide_splash() {
+    const int result = sceSystemServiceHideSplashScreen();
+    if (result != 0)
+        log("system: HideSplashScreen=0x%08x", static_cast<unsigned>(result));
+}
+
+void park() {
+    for (;;)
+        sceKernelUsleep(100000);
+}
+
+void exit_app() {
+    log("system: requesting title closure");
+    std::fflush(nullptr);
+    const int result = sceSystemServiceLoadExec("exit", nullptr);
+    log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
+    park();
+}
+
+} // namespace ps4::system

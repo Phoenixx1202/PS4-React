@@ -1,0 +1,15 @@
+{
+  "titleId": "CUSA99063",
+  "contentId": "UP0001-CUSA99063_00-PS4SAMPLEFILE001",
+  "name": "PS4 React Sample: Files",
+  "version": "01.000.000",
+  "render": {
+    "width": 2560,
+    "height": 1440
+  },
+  "surface": {
+    "width": 1920,
+    "height": 1080
+  },
+  "timeoutSeconds": 30
+}

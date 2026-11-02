@@ -1,0 +1,48 @@
+{
+    "embeddedReact":  {
+                          "url":  "https://github.com/TheMasterCoder007/embedded-react.git",
+                          "revision":  "cf5dfe4fae966fe21a265acc3dd3b054d245f981",
+                          "patches":  [
+                                          "patches/embeddedReact-flex-wrap-auto-height.patch",
+                                          "patches/embeddedReact-scaled-image-clip.patch",
+                                          "patches/embeddedReact-identity-scale.patch",
+                                          "patches/embeddedReact-view-gradient.patch",
+                                          "patches/embeddedReact-scroll-offset.patch",
+                                          "patches/embeddedReact-scroll-to.patch",
+                                          "patches/embeddedReact-scroll-copy.patch",
+                                          "patches/embeddedReact-damage-split.patch",
+                                          "patches/embeddedReact-scroll-copy-paint-free.patch",
+                                          "patches/embeddedReact-software-avx2.patch",
+                                          "patches/embeddedReact-image-unload.patch",
+                                          "patches/embeddedReact-aspect-main-size.patch",
+                                          "patches/embeddedReact-translate-subtree.patch",
+                                          "patches/embeddedReact-occluded-translate.patch",
+                                          "patches/embeddedReact-text-wrap-height.patch",
+                                          "patches/embeddedReact-image-radius.patch",
+                                          "patches/embeddedReact-bold-wrap.patch",
+                                          "patches/embeddedReact-paint-free-move.patch",
+                                          "patches/embeddedReact-border-sweep.patch",
+                                          "patches/embeddedReact-border-gradient.patch",
+                                          "patches/embeddedReact-border-radial.patch",
+                                          "patches/embeddedReact-european-glyphs.patch",
+                                          "patches/embeddedReact-text-shaper.patch",
+                                          "patches/embeddedReact-text-direction.patch",
+                                          "patches/embeddedReact-text-clip.patch"
+                                      ]
+                      },
+    "quickjs":  {
+                    "version":  "0.15.0",
+                    "url":  "https://github.com/quickjs-ng/quickjs.git",
+                    "tag":  "v0.15.0"
+                },
+    "harfbuzz":  {
+                     "version":  "14.6.0",
+                     "url":  "https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz",
+                     "sha256":  "d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586"
+                 },
+    "sheenBidi":  {
+                      "version":  "3.0.0",
+                      "url":  "https://github.com/Tehreer/SheenBidi/archive/refs/tags/v3.0.0.tar.gz",
+                      "sha256":  "86c56014034739ba39a24c23eb00323b0bf6f737354f665786015fca842af786"
+                  }
+}

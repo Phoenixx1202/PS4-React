@@ -1,0 +1,58 @@
+name: Build PS4 PKG
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache build dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .deps/embeddedReact
+            .deps/quickjs
+            .deps/harfbuzz-src
+            .build/harfbuzz
+          key: ps4-react-deps-${{ hashFiles('dependencies.lock.json') }}
+
+      - name: Install PacBrew toolchain and runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pacman-package-manager libarchive-tools cmake make git curl xz-utils python3
+          sudo ln -sf /proc/mounts /etc/mtab
+          sudo tee -a /etc/pacman.conf >/dev/null <<'EOF'
+
+          [pacbrew]
+          SigLevel = Optional TrustAll
+          Server = https://pacman.mydedibox.fr/pacbrew/packages/
+          EOF
+          sudo pacman -Sy --noconfirm
+          sudo pacman -S --noconfirm ps4-openorbis pacbrew-ps4-portlibs
+
+      - name: Build PS4-React-Starter.pkg
+        run: bash tools/build_ci.sh
+
+      - name: Upload PKG
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS4-React-Starter
+          path: build/PS4-React-Starter.pkg
+          if-no-files-found: error

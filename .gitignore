@@ -1,0 +1,8 @@
+build/
+.build/
+.deps/
+samples-pkg/
+*.oelf
+*.self
+*.pkg
+logs/

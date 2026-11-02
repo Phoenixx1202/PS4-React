@@ -1,0 +1,31 @@
+# Embedded React libraries for the PS4 host.
+
+if(NOT ER_ROOT)
+    message(FATAL_ERROR "Set -DER_ROOT=/path/to/embedded-react")
+endif()
+if(NOT EXISTS "${ER_ROOT}/engine/CMakeLists.txt")
+    message(FATAL_ERROR "ER_ROOT does not contain engine/CMakeLists.txt: ${ER_ROOT}")
+endif()
+
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(ERUI_BORDER_AA ON CACHE BOOL "" FORCE)
+set(ERUI_TRANSFORMS FULL CACHE STRING "" FORCE)
+set(ERUI_SCRATCH_W 512 CACHE STRING "" FORCE)
+set(ERUI_SCRATCH_H 512 CACHE STRING "" FORCE)
+set(ERUI_MAX_ANIM_VALUES 1024 CACHE STRING "" FORCE)
+set(ERUI_MAX_VALUE_BINDINGS 8 CACHE STRING "" FORCE)
+set(ERUI_BILINEAR_SCALE ON CACHE BOOL "" FORCE)
+set(ERUI_MAX_IMG_ROW_PIXELS 1920 CACHE STRING "" FORCE)
+set(ERUI_IMAGE_REGISTRY_MAX 128 CACHE STRING "" FORCE)
+set(ERUI_GRADIENT ON CACHE BOOL "" FORCE)
+set(ERUI_GRADIENT_RADIAL ON CACHE BOOL "" FORCE)
+set(ERUI_MAX_VECTOR_NODES 64 CACHE STRING "" FORCE)
+set(ERUI_VECTOR_CACHE_NODES 16 CACHE STRING "" FORCE)
+set(ERUI_PERF_STATS ON CACHE BOOL "" FORCE)
+set(ERUI_MAX_NODES 1024 CACHE STRING "" FORCE)
+
+add_subdirectory("${ER_ROOT}/engine" embedded-react-engine)
+
+add_library(er-software STATIC "${ER_ROOT}/backends/software/renderer_backend.c")
+target_include_directories(er-software PUBLIC "${ER_ROOT}/backends/software")
+target_link_libraries(er-software PUBLIC embedded-react)

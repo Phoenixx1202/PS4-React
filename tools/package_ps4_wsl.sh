@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Package the built PoC into a PS4 PKG inside the PacBrew rootfs.
+#
+# Usage:
+#   tools/package_ps4_wsl.sh [rootfs] [project] [build-dir] [app-dir] [title-id] [content-id] [title] [output]
+set -euo pipefail
+
+ROOTFS="${1:-/opt/codex-pacbrew-rootfs/rootfs}"
+PROJECT="${2:-/mnt/c/Port/PS4-React}"
+BUILD="${3:-$PROJECT/build/native/ps4}"
+APP="${4:-$PROJECT/build/app}"
+TITLE_ID="${5:-CUSA99053}"
+CONTENT_ID="${6:-UP0001-CUSA99053_00-PS4REACTPOC00000}"
+TITLE="${7:-PS4 React PoC}"
+OUTPUT="${8:-$PROJECT/build/PS4-React-PoC.pkg}"
+OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
+
+mkdir -p "$ROOTFS/mnt/c" "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys"
+if ! mountpoint -q "$ROOTFS/mnt/c"; then
+    mount --bind /mnt/c "$ROOTFS/mnt/c"
+fi
+# The .NET-based PkgTool.Core resolves /proc/self/exe; mount proc before chroot.
+mountpoint -q "$ROOTFS/proc" || mount -t proc proc "$ROOTFS/proc"
+mountpoint -q "$ROOTFS/dev" || mount --rbind /dev "$ROOTFS/dev"
+mountpoint -q "$ROOTFS/sys" || mount --rbind /sys "$ROOTFS/sys"
+
+chroot "$ROOTFS" /usr/bin/env OPENORBIS="$OPENORBIS" /bin/bash -lc "
+    set -euo pipefail
+    python3 '$PROJECT/tools/package_ps4.py' '$BUILD' \
+        --app-dir '$APP' \
+        --title-id '$TITLE_ID' \
+        --content-id '$CONTENT_ID' \
+        --title '$TITLE' \
+        --output '$OUTPUT'
+"

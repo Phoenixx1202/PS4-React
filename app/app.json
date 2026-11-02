@@ -1,0 +1,16 @@
+{
+  "$schema": "../../app.schema.json",
+  "titleId": "CUSA99059",
+  "contentId": "UP0001-CUSA99059_00-PS4REACTSTARTER0",
+  "name": "PS4 React Starter",
+  "version": "01.000.000",
+  "render": {
+    "width": 2560,
+    "height": 1440
+  },
+  "surface": {
+    "width": 1920,
+    "height": 1080
+  },
+  "timeoutSeconds": 30
+}
