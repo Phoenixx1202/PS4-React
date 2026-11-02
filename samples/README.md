@@ -12,6 +12,7 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample network
 .\tools\build_ps4.ps1 -Sample images
 .\tools\build_ps4.ps1 -Sample files
+.\tools\build_ps4.ps1 -Sample settings
 ```
 
 On Linux:
@@ -44,6 +45,7 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `network` | `Http.request`, loading/error states and retry |
 | `images` | `<Image>` with a remote PNG, `onLoad`/`onError` |
 | `files` | `FileSystem.writeFile`, `readFile` and `readDir` under `/download0` |
+| `settings` | `SaveData.mount` and `Keyboard.prompt`, persisting JSON in save data |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
 font sizes each app uses.
@@ -60,7 +62,6 @@ of the PKGs to a release when a `v*` tag is pushed.
 - `device`: `DeviceInfo`, `Users` and `Notifications`.
 - `gallery`: a grid of remote images backed by `ScrollView`.
 - `list`: `VirtualList` with a few hundred rows to test scrolling and focus.
-- `settings`: persist state with `FileSystem` between launches.
 
 Samples are standalone: copy one to `app/` if you want to use it as the default
 build, or add new folders under `samples/` and run `-Sample <name>`.

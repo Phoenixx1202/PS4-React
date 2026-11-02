@@ -12,8 +12,8 @@ export {View, Image, Pressable, ScrollView, VirtualList, FocusScope, useFocusabl
   useNavigationEvents} from './focus/index.js';
 export {motion, AnimatePresence, transitions} from './motion/index.js';
 export {DownloadFormats} from './download-formats.js';
-export {Platform, DeviceInfo, FileSystem, Notifications, Users, Controller, useGamepad, Linking, Power, Fonts, BackHandler,
-  Http, Downloads, Archives, Packages, Sound} from './native.js';
+export {Platform, DeviceInfo, FileSystem, Notifications, Users, SaveData, Keyboard, Controller, useGamepad, Linking, Power,
+  Fonts, BackHandler, Http, Downloads, Archives, Packages, Sound} from './native.js';
 
 // Input protocol v1 compatibility: each direction is followed by its legacy action.
 const legacyActions = {up: 'previous', left: 'previous', down: 'next', right: 'next'};

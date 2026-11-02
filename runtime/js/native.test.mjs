@@ -3,7 +3,52 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Downloads, FileSystem, Http, Power, Sound} from './native.js';
+import {acquireImage, Archives, Downloads, FileSystem, Http, Keyboard, Power, SaveData, Sound} from './native.js';
+
+test('SaveData forwards mount, unmount and remove to the host', () => {
+  assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
+  globalThis.__ps4ReactNative = {};
+  assert.throws(() => SaveData.mount({dirName: 'slot1'}), /not available/);
+  const calls = [];
+  globalThis.__ps4ReactNative = {saveData: {
+    mount: (...args) => { calls.push(args); return {path: '/savedata0'}; },
+    unmount: dir => { calls.push(['unmount', dir]); return true; },
+    remove: dir => { calls.push(['remove', dir]); return true; },
+  }};
+  try {
+    assert.deepEqual(SaveData.mount({dirName: 'slot1', blocks: 128, title: 'Save'}),
+      {path: '/savedata0'});
+    assert.deepEqual(calls, [['slot1', 128, 'Save', '', '']]);
+    assert.equal(SaveData.unmount('slot1'), true);
+    assert.equal(SaveData.remove('slot1'), true);
+    assert.deepEqual(calls.slice(1), [['unmount', 'slot1'], ['remove', 'slot1']]);
+  } finally {
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('Keyboard.prompt resolves the text and cancels through the task', async () => {
+  const originalInterval = globalThis.setInterval, originalClear = globalThis.clearInterval;
+  let tick, snapshots = [];
+  const calls = [];
+  globalThis.setInterval = callback => { tick = callback; return 1; };
+  globalThis.clearInterval = () => {};
+  globalThis.__ps4ReactNative = {ime: {
+    start: (...args) => { calls.push(args); return 1; },
+    poll: () => snapshots,
+    cancel: () => {},
+  }};
+  try {
+    const prompt = Keyboard.prompt({title: 'Name', value: 'A', maxLength: 32});
+    assert.deepEqual(calls, [['Name', '', 'A', 32, 'default']]);
+    snapshots = [{id: 1, state: 'completed', text: 'Alice', error: ''}];
+    tick();
+    assert.equal((await prompt.done).text, 'Alice');
+  } finally {
+    globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
+    delete globalThis.__ps4ReactNative;
+  }
+});
 
 test('native network tasks deliver progress, release listeners and stop polling', async () => {
   let tick;

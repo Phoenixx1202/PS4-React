@@ -25,6 +25,8 @@ The default build produces a single installable package:
   SheenBidi; apps package only the Noto fonts they use.
 - **Native filesystem** under `/app0`, `/data` and `/download0`.
 - **PKG installation** through `sceAppInstUtil` via `Packages.install`.
+- **Save data** through `sceSaveData` and the system on-screen keyboard through
+  `sceImeDialog`.
 - **PKG packaging** validated with `PkgTool.Core` and a load-image checker.
 - **Dev hot reload** over TCP when the build enables `-DPS4_REACT_DEV_SERVER=ON`.
 
@@ -160,10 +162,12 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `FileSystem` | Read, write, list, rename and inspect files |
 | `Controller` / `useGamepad` | Light bar, vibration and pad state |
 | `Packages.install` | Install a PKG through `sceAppInstUtil` |
+| `SaveData` | Mount, unmount and delete PS4 save data |
+| `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
-`Payloads` and `BrowserCapture` are not part of the PS4 runtime. Save data,
-IME/message dialogs and music streaming are not implemented yet.
+`Payloads` and `BrowserCapture` are not part of the PS4 runtime. Message
+dialogs and music streaming are not implemented yet.
 
 Paths:
 
@@ -201,9 +205,9 @@ Validated on PS4 hardware:
 Known limitations:
 
 - RAR/RAR5 extraction is not available yet; ZIP/TAR/7z are supported.
-- Save data, IME/message dialogs and music streaming are not implemented yet.
-- `Packages.install` uses `sceAppInstUtil` and still needs validation on the
-  firmware versions you target.
+- Message dialogs and music streaming are not implemented yet.
+- `Packages.install`, `SaveData` and `Keyboard.prompt` use system services and
+  still need validation on the firmware versions you target.
 - Runtime text shaping needs the app to package the Noto fonts it uses.
 - Hot reload only replaces JavaScript; asset changes require a new PKG.
 

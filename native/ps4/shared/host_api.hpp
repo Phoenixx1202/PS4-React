@@ -59,6 +59,9 @@
 //                                  sceAppInstUtil
 //   packages.cancel(id)            stops reporting; an install the console accepted carries on
 //   packages.poll()                state/error/titleId/status/written/total; consumes terminal results
+//   saveData.mount(dir, blocks, title, subtitle, details) -> {path}; synchronous mount
+//   saveData.unmount(dir?)         unmounts one directory, or every mounted directory
+//   saveData.remove(dir)           unmounts the directory and deletes its save data
 //   network.version()              transport version string
 //   image.load(url, width, height, fit, prefetch) {id, state, name, width, height, error, color}; takes a
 //                                  reference; fit: 0 cover, 1 contain, 2 stretch, 3 none; prefetch
@@ -207,3 +210,5 @@ void ps4_react_stop_sound();
 JSValue ps4_react_archive_api(JSContext* ctx);
 // ABI v5 additive package installs: install(path, name), cancel(id), poll().
 JSValue ps4_react_package_api(JSContext* ctx);
+JSValue ps4_react_save_data_api(JSContext* ctx);
+JSValue ps4_react_ime_api(JSContext* ctx);

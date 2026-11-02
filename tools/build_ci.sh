@@ -169,6 +169,7 @@ if [ ! -f "$GEN/app/index.jsx" ]; then
 fi
 
 node "$ROOT/tools/ps4_app_config.mjs" "$GEN/app/app.json" 1920 1080
+node "$ROOT/tools/app_header.mjs" "$GEN/app/app.json" "$GEN/app_config.generated.h"
 node "$ROOT/tools/bundle.mjs" "$ER" "$GEN/app" "$GEN"
 node "$ROOT/tools/ps4_bundle_assets.mjs" "$GEN/app" "$GEN/app.bundle.js"
 node "$ROOT/tools/bundle.mjs" "$ER" "$GEN/app" "$GEN"

@@ -99,6 +99,36 @@ export const Notifications = {
   show: (message, subMessage = '') => host().notify(message, subMessage),
 };
 
+/**
+ * PS4 save data mounted by the system. The returned path can be used with the
+ * regular `FileSystem` APIs. Mount is synchronous because the system call is
+ * short; call it from an event handler before writing.
+ */
+export const SaveData = {
+  /**
+   * @param {{dirName?: string, blocks?: number, title?: string, subtitle?: string,
+   *   details?: string}} [options]
+   * @returns {{path: string}}
+   */
+  mount({dirName = 'save', blocks = 96, title = '', subtitle = '', details = ''} = {}) {
+    const backend = host().saveData;
+    if (typeof backend?.mount !== 'function') throw new Error('SaveData is not available on this host');
+    return Object.freeze(backend.mount(dirName, blocks, title, subtitle, details));
+  },
+  /** Unmount one directory, or every mounted directory when omitted. @param {string} [dirName] */
+  unmount(dirName = '') {
+    const backend = host().saveData;
+    if (typeof backend?.unmount !== 'function') throw new Error('SaveData is not available on this host');
+    return backend.unmount(dirName);
+  },
+  /** Unmount and delete a save-data directory. @param {string} dirName */
+  remove(dirName) {
+    const backend = host().saveData;
+    if (typeof backend?.remove !== 'function') throw new Error('SaveData is not available on this host');
+    return backend.remove(dirName);
+  },
+};
+
 export const Users = {
   /** @returns {User | null} */
   getForeground: () => host().users.foreground(),
@@ -194,6 +224,23 @@ export const Fonts = {
 };
 
 const backListeners = [];
+
+/**
+ * The console's on-screen keyboard. `prompt` resolves with `{text, ...}` when
+ * the user confirms; cancelling rejects with an AbortError.
+ */
+export const Keyboard = {
+  /**
+   * @param {{title?: string, placeholder?: string, value?: string, maxLength?: number,
+   *   type?: 'default' | 'basic' | 'url' | 'email' | 'number'}} [options]
+   */
+  prompt({title = '', placeholder = '', value = '', maxLength = 256, type = 'default'} = {}) {
+    const backend = host().ime;
+    if (typeof backend?.start !== 'function') throw new Error('Keyboard is not available on this host');
+    const id = backend.start(title, placeholder, value, maxLength, type);
+    return networkTask(id, 'Keyboard.prompt', '', 'ime');
+  },
+};
 
 export const BackHandler = {
   /**

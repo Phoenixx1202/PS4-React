@@ -19,6 +19,8 @@
 
 #include <orbis/Pad.h>
 
+#include "app_config.generated.h"
+
 extern "C" {
 #include "assets.generated.h"
 #include "er_runtime.h"

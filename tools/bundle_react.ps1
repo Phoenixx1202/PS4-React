@@ -82,6 +82,10 @@ Invoke-Native {
     node (Join-Path $ProjectPath 'tools\ps4_app_config.mjs') `
         (Join-Path $stage 'app.json') 1920 1080
 } 'PS4 app config'
+Invoke-Native {
+    node (Join-Path $ProjectPath 'tools\app_header.mjs') `
+        (Join-Path $stage 'app.json') (Join-Path $output 'app_config.generated.h')
+} 'PS4 app header'
 
 # First pass: bundle and discover the font sizes the 1920px layout uses.
 Invoke-Native {
