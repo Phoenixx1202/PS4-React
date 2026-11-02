@@ -1,5 +1,10 @@
 # PS4 React
 
+<img width="256" height="256" alt="ReactPS4" src="https://github.com/user-attachments/assets/bff50afb-4d87-43fa-bd34-c0381147843d" />
+
+
+
+
 React + JSX runtime for PlayStation 4 homebrew. It renders a real React tree
 through Embedded React, runs JavaScript on QuickJS and presents a 1920×1080
 framebuffer with `sceVideoOut` — no OpenGL or shader compilation.
