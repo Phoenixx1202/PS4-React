@@ -14,6 +14,13 @@ if [ -f "$OPENORBIS/ps4vars.sh" ]; then
     source "$OPENORBIS/ps4vars.sh"
 fi
 
+# ps4vars.sh exports CFLAGS/CXXFLAGS/CPPFLAGS with an extra
+# "-isystem $OPENORBIS/include/c++/v1". CMake puts environment flags before
+# the toolchain's own flags, and that order makes OpenOrbis' libc++ pick the
+# C <math.h> instead of its C++ wrapper. <cmath> then fails on "using ::abs".
+# The CMake toolchain file already sets the correct compiler flags.
+unset CFLAGS CXXFLAGS CPPFLAGS
+
 LOCK="$ROOT/dependencies.lock.json"
 DEPS="$ROOT/.deps"
 ER="$DEPS/embeddedReact"

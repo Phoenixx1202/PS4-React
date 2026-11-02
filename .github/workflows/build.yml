@@ -30,7 +30,7 @@ jobs:
             .deps/quickjs
             .deps/harfbuzz-src
             .build/harfbuzz
-          key: ps4-react-deps-${{ hashFiles('dependencies.lock.json') }}
+          key: ps4-react-deps-v2-${{ hashFiles('dependencies.lock.json', 'tools/build_ci.sh') }}
 
       - name: Install PacBrew toolchain and runtime libraries
         run: |
