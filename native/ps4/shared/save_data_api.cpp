@@ -108,7 +108,10 @@ JSValue mount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
         return failure(ctx, "SaveData.mount", code);
 
     Mounted entry;
-    entry.path = result.mountPathName;
+    std::size_t path_length = 0;
+    while (path_length < sizeof result.mountPathName && result.mountPathName[path_length])
+        ++path_length;
+    entry.path.assign(result.mountPathName, path_length);
     std::memcpy(entry.point.data, result.mountPathName, sizeof entry.point.data);
     if (entry.path.empty()) {
         sceSaveDataUmount(&entry.point);

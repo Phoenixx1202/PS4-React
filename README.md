@@ -169,6 +169,20 @@ JavaScript reaches the host through `@ps4-react/core`.
 `Payloads` and `BrowserCapture` are not part of the PS4 runtime. Message
 dialogs and music streaming are not implemented yet.
 
+Save data and the system keyboard are available from the same import:
+
+```jsx
+import {SaveData, Keyboard, FileSystem} from '@ps4-react/core';
+
+const save = SaveData.mount({dirName: 'settings', title: 'My App'});
+FileSystem.writeFile(`${save.path}/settings.json`, '{"name":"Player"}', {sync: true});
+
+const result = await Keyboard.prompt({title: 'Player name', value: 'Player'}).done;
+console.log(result.text);
+```
+
+The `settings` sample in [`samples/`](samples/) demonstrates both APIs.
+
 Paths:
 
 - `/app0` — read-only package contents (the PKG root);
