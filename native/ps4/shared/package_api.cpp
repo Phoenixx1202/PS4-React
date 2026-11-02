@@ -31,6 +31,8 @@ struct Task {
 std::mutex tasks_mutex;
 std::vector<std::shared_ptr<Task>> tasks;
 std::atomic<std::uint32_t> next_id{1};
+std::once_flag install_init;
+int install_init_result = 0;
 
 const char* state_name(State state) {
     switch (state) {
@@ -70,12 +72,14 @@ bool resolve(JSContext* ctx, JSValueConst value, std::string& out) {
 
 void run_install(const std::shared_ptr<Task>& task) {
     task->state = State::installing;
-    int result = sceAppInstUtilInitialize();
-    if (result != 0 && result != static_cast<int>(0x80a10001u)) {
-        fail(*task, "sceAppInstUtilInitialize failed", result);
+    std::call_once(install_init, [] { install_init_result = sceAppInstUtilInitialize(); });
+    if (install_init_result != 0 &&
+        install_init_result != static_cast<int>(0x80a10001u)) {
+        fail(*task, "sceAppInstUtilInitialize failed", install_init_result);
         return;
     }
 
+    int result = 0;
     char title_id[16] = {};
     int is_app = 0;
     result = sceAppInstUtilGetTitleIdFromPkg(task->path.c_str(), title_id, &is_app);
