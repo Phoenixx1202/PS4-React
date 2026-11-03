@@ -170,6 +170,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Dialog` | System message dialogs (`alert` and `confirm`) |
+| `AppState` | App lifecycle state and system events (resume, URL open, focus) |
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
 `Payloads` and `BrowserCapture` are not part of the PS4 runtime. Music
@@ -228,7 +229,9 @@ Validated on PS4 hardware:
 - Japanese, Simplified Chinese and Arabic shaping at 59.9 fps;
 - PS4 save-data mount and broken-directory recovery, with JSON persistence
   through the `settings` sample;
-- the system on-screen keyboard feeding text back into React.
+- the system on-screen keyboard feeding text back into React;
+- system message dialogs (`Dialog.alert`/`Dialog.confirm`) with Cross confirm
+  and input suppression while a dialog or the keyboard is open.
 
 Known limitations:
 

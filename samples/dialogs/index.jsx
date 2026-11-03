@@ -1,5 +1,5 @@
-import {useState} from 'react';
-import {AppRegistry, View, Text, FocusScope, Dialog} from '@ps4-react/core';
+import {useEffect, useState} from 'react';
+import {AppRegistry, View, Text, FocusScope, Dialog, AppState} from '@ps4-react/core';
 import font from '../assets/Inter-Regular.ttf';
 
 function Button({label, onPress, autoFocus}) {
@@ -21,6 +21,18 @@ function Button({label, onPress, autoFocus}) {
 
 function App() {
   const [status, setStatus] = useState('Choose a dialog.');
+  const [app, setApp] = useState({state: 'active', event: 'none'});
+
+  useEffect(() => {
+    try {
+      const subscription = AppState.addEventListener('change', info => {
+        setApp({state: info.state, event: info.event});
+      });
+      return () => subscription.remove();
+    } catch {
+      return undefined;
+    }
+  }, []);
 
   const alert = async () => {
     try {
@@ -57,6 +69,9 @@ function App() {
         </Text>
         <Text style={{fontFamily: font, fontSize: 30, color: '#c8d6e5'}}>
           {status}
+        </Text>
+        <Text style={{fontFamily: font, fontSize: 24, color: '#8fa6b8'}}>
+          {`AppState: ${app.state} / ${app.event}`}
         </Text>
         <View style={{flexDirection: 'row', gap: 24}}>
           <Button label="Alert" onPress={alert} autoFocus />

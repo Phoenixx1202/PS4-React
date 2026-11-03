@@ -308,6 +308,60 @@ export function dispatchBackPress() {
   return false;
 }
 
+const appStateListeners = new Set();
+let appStateTimer = null;
+
+function pollAppState() {
+  let events;
+  try {
+    events = host().appState.poll();
+  } catch {
+    return;
+  }
+  if (!events.length) return;
+  const current = host().appState.get();
+  for (const event of events) {
+    for (const listener of [...appStateListeners]) {
+      try {
+        listener({...current, event: event.name, url: event.url || ''});
+      } catch (error) {
+        console.error('AppState listener failed:', error);
+      }
+    }
+  }
+}
+
+/**
+ * App lifecycle from the system service: the current state and resume, URL
+ * open, launch and focus events. Add a `'change'` listener to receive them.
+ */
+export const AppState = {
+  /** @returns {'active' | 'background'} */
+  get current() {
+    return host().appState?.get().state ?? 'active';
+  },
+  /**
+   * @param {'change'} type
+   * @param {(state: {state: string, lastEvent: string, lastUrl: string,
+   *   event: string, url: string}) => void} listener
+   * @returns {{remove: () => void}}
+   */
+  addEventListener(type, listener) {
+    if (type !== 'change') throw new TypeError(`AppState.addEventListener: only 'change' is supported, got '${type}'`);
+    if (typeof listener !== 'function') throw new TypeError('AppState.addEventListener: expected a function');
+    if (!host().appState) throw new Error('AppState is not available on this host');
+    appStateListeners.add(listener);
+    if (appStateTimer === null) appStateTimer = setInterval(pollAppState, 250);
+    return {remove() {
+      appStateListeners.delete(listener);
+      if (appStateListeners.size === 0 && appStateTimer !== null) {
+        clearInterval(appStateTimer);
+        appStateTimer = null;
+      }
+    }};
+  },
+};
+
 const networkTasks = new Map();
 let networkTimer = null;
 

@@ -500,6 +500,7 @@ void ps4_react_install_host_api(JSContext* ctx) {
   JS_SetPropertyStr(ctx, api, "saveData", ps4_react_save_data_api(ctx));
   JS_SetPropertyStr(ctx, api, "ime", ps4_react_ime_api(ctx));
   JS_SetPropertyStr(ctx, api, "dialog", ps4_react_dialog_api(ctx));
+  JS_SetPropertyStr(ctx, api, "appState", ps4_react_app_state_api(ctx));
   JS_SetPropertyStr(ctx, api, "image", ps4_react_image_api(ctx));
   JS_SetPropertyStr(ctx, api, "sound", ps4_react_sound_api(ctx));
   JSValue global = JS_GetGlobalObject(ctx);

@@ -74,14 +74,17 @@ recebe os eventos.
 
 ### 1.2 Diálogos do sistema
 
-- [ ] `sceMsgDialog` (alert/confirm/error/progress) com API JS `Dialog`;
-- [ ] ciclo `sceMsgDialogInitialize/Open/GetStatus/GetResult/Terminate`;
-- [ ] tratar suspend e foco enquanto o diálogo está aberto;
-- [ ] usar Cross/O conforme `ATTRIBUTE=2`;
-- [ ] sample `dialogs`.
+- [x] `Dialog.alert`/`Dialog.confirm` via `sceMsgDialog`;
+- [ ] barra de progresso (`sceMsgDialogProgressBar*`);
+- [x] ciclo `sceMsgDialogInitialize/Open/GetStatus/GetResult/Terminate`;
+- [x] ignorar o pad do app enquanto o diálogo ou o IME está aberto
+  (tratamento de suspend/foco fica na 1.1);
+- [x] usar Cross/O conforme `ATTRIBUTE=2`;
+- [x] sample `dialogs`.
 
 **Aceite:** abrir, confirmar, cancelar e fechar; sem travar o render; mensagem
-de erro do host consegue usar o diálogo do sistema.
+de erro do host consegue usar o diálogo do sistema. Núcleo validado no
+hardware; barra de progresso pendente.
 
 ### 1.3 `Packages` completo
 
@@ -318,8 +321,11 @@ Ao marcar uma tarefa, acrescente uma linha aqui com commit, data, console e
 firmware/GoldHEN:
 
 ```text
-- 2026-11-02 — baseline: big app, heap, exit, save data, teclado e IME
+- 2026-11-02 - baseline: big app, heap, exit, save data, teclado e IME
   validados no hardware; commit 5d0e9d8.
+- 2026-11-02 - Dialog.alert/Dialog.confirm validados no hardware (sample
+  dialogs, PKG 6fef91d3681a7a929193c8159c5d1c4f449927aa10fe5ae4430bfe6fe7bf1d9c);
+  commit local d1bca53, sem push.
 ```
 
 ## Changelog do plano

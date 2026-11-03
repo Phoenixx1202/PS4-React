@@ -221,3 +221,8 @@ bool ps4_react_dialog_active();
 bool ps4_react_ime_active();
 // True while either a message dialog or the on-screen keyboard owns input.
 bool ps4_react_system_dialog_active();
+
+// ABI v7: system-service events and app lifecycle (resume, URL open, focus).
+// The host calls the pump once per frame; JavaScript reads it through AppState.
+void ps4_react_app_state_pump();
+JSValue ps4_react_app_state_api(JSContext* ctx);

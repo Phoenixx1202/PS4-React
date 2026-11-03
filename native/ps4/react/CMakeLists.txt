@@ -60,6 +60,7 @@ add_executable(ps4_react_starter
     ../shared/save_data_api.cpp
     ../shared/ime_api.cpp
     ../shared/dialog_api.cpp
+    ../shared/app_state.cpp
     ../shared/text_shaper.cpp
     ../third_party/sheenbidi/Source/SheenBidi.c
     ../audio_out.cpp

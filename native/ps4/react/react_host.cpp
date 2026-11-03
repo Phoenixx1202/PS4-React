@@ -249,6 +249,7 @@ int main() {
 
     for (;;) {
         host::tick();
+        ps4_react_app_state_pump();
         const std::int64_t now = ps4::system::monotonic_us();
         hui::PadSample samples[1];
         std::size_t count = 0;
