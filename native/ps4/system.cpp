@@ -146,25 +146,30 @@ void park() {
         sceKernelUsleep(100000);
 }
 
-void exit_app() {
+bool request_close() {
     log("system: requesting title closure");
     std::fflush(nullptr);
 
-    // Ask the system to close the title. This is refused when the package is
-    // registered as a mini app (0x80a10005); a big app gets closed asynchronously
-    // by the shell. If the request is refused, go home instead of calling
-    // _exit(): the app sandbox turns that into SIGSYS and the system reports a
-    // crash over a clean close.
+    // Ask the system to close the title. The system accepts this only while the
+    // app still owns its display, so callers try it before tearing down VideoOut
+    // and the rest of the process state.
     const int result = sceSystemServiceLoadExec("exit", nullptr);
     log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
-    if (result == 0) {
-        log("system: close accepted; waiting for the system");
-        park();
-    }
+    return result == 0;
+}
 
+void go_home() {
+    // The close request was refused. Return to the dashboard with the display
+    // still alive; the shell suspends the app in the background. Do not call
+    // _exit here: the app sandbox turns it into SIGSYS and the system reports a
+    // crash over a clean close.
     sceSystemServiceNavigateToGoHome();
     log("system: NavigateToGoHome requested");
     park();
+}
+
+void exit_app() {
+    go_home();
 }
 
 } // namespace ps4::system

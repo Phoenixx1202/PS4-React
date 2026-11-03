@@ -318,16 +318,16 @@ int main() {
         if (ps4_react_exit_requested()) break;
     }
 
-    er_runtime_shutdown();
-    text_shaper::shutdown();
-    ps4_react_stop_sound();
-    archives::stop();
-    ps4_react_stop_images();
-    network::stop();
-    er_software_backend_destroy();
-    host::attach_pad(nullptr);
-    display.close();
-    pad.close();
     ps4::system::log("PS4 React Starter: loop ended after %u frames", total_frames);
-    ps4::system::exit_app();
+
+    // Try the close while the display and focus are still ours. The system
+    // refuses the request after VideoOut and the rest of the state are gone.
+    if (ps4::system::request_close()) {
+        ps4::system::log("system: close accepted; waiting for the system");
+        ps4::system::park();
+    }
+
+    // Refused: return to the dashboard with the UI still alive. The shell
+    // suspends the app in the background; _exit would be SIGSYS and a crash.
+    ps4::system::go_home();
 }

@@ -25,8 +25,15 @@ void hide_splash();
 
 [[noreturn]] void park();
 
-// Requests title closure through the system service, then parks if the
-// request is refused.
+// Tries the system close request while the app still owns its display and
+// focus. Returns true when the shell accepted it.
+bool request_close();
+
+// Navigates to the dashboard and parks. Used when the close request is
+// refused; the shell suspends the app in the background.
+[[noreturn]] void go_home();
+
+// Fallback used after teardown: navigate home and park.
 [[noreturn]] void exit_app();
 
 } // namespace ps4::system
