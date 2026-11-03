@@ -66,7 +66,8 @@ add_executable(ps4_react_starter
     ../display_video.cpp
     ../system.cpp
     ../pad.cpp
-    ../heap.cpp
+    ../ps4_heap.cpp
+    ../ps4_dlmalloc.c
     ../hui/core/input.cpp
     ../hui/audio/mixer.cpp
     ../shared/host_api.cpp
@@ -124,6 +125,7 @@ set_source_files_properties(
     "${PS4_REACT_GENERATED_DIR}/assets.generated.c"
     "${PS4_REACT_GENERATED_DIR}/sounds.generated.c"
     PROPERTIES COMPILE_OPTIONS "-w")
+set_source_files_properties(../ps4_dlmalloc.c PROPERTIES COMPILE_OPTIONS "-w")
 set_source_files_properties(../third_party/sheenbidi/Source/SheenBidi.c
     PROPERTIES COMPILE_DEFINITIONS "SB_CONFIG_UNITY")
 

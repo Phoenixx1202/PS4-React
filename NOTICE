@@ -26,5 +26,8 @@ PS4 port additions:
 - HarfBuzz 14.6.0 (Old MIT, licenses/harfbuzz-COPYING), built for PS4.
 - SheenBidi 3.0.0 (Apache-2.0, licenses/sheenbidi-LICENSE), vendored under native/ps4/third_party/sheenbidi.
 - stb_image 2.30 (public domain / MIT, native/ps4/third_party/stb_image.h).
+- dlmalloc 2.8.6 by Doug Lea (MIT-0), vendored under native/ps4/third_party/dlmalloc.
+- The PS4 libc heap and crt1 process-parameter adaptation is based on
+  DolphinPS4 by iHaiDeeZ and PS4SX2 by Phoenixx1202, GPL-3.0-or-later.
 - Mozilla CA bundle (assets/ca-bundle.crt).
 - Optional Noto Sans JP/SC/Arabic fonts (SIL OFL 1.1) when packaged by an app.

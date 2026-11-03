@@ -21,15 +21,17 @@ fi
 # The CMake toolchain file already sets the correct compiler flags.
 unset CFLAGS CXXFLAGS CPPFLAGS
 
-# OpenOrbis' crt1.o requests the "default" libc heap (-1), which is only about
-# 12.7 MiB on hardware. A mini app inherits the shell heap; a big app gets its
-# own and the first allocation can fault inside libSceLibcInternal. Patch a
-# project-local copy and point the linker at it, without writing to the
-# toolchain install (read-only on CI runners).
+# OpenOrbis' crt1.o leaves libc's malloc replacement table empty; libc then
+# builds its own heap by mapping about 2.5 GiB of system flexible memory on the
+# first malloc. That fails on retail consoles and the next allocation faults at
+# address 0x38. Build our crt1.o instead: same entry point and process
+# parameters, but the malloc table points at the ps4_replace_* functions, which
+# use a dlmalloc heap mapped by ps4_heap.cpp.
 CRT1="$ROOT/.build/crt1.o"
 mkdir -p "$ROOT/.build"
-cp "$OPENORBIS/lib/crt1.o" "$CRT1"
-python3 "$ROOT/tools/patch_crt1.py" "$CRT1" --heap-mib 512
+"$OPENORBIS/bin/clang" --target=x86_64-pc-freebsd12-elf -fPIC \
+    -isysroot "$OPENORBIS" -isystem "$OPENORBIS/include" \
+    -c "$ROOT/native/ps4/ps4_crt1.S" -o "$CRT1"
 
 SAMPLE=""
 NO_PACKAGE=0
