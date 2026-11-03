@@ -30,6 +30,11 @@ The default build produces a single installable package:
 - **PKG packaging** validated with `PkgTool.Core` and a load-image checker.
 - **Dev hot reload** over TCP when the build enables `-DPS4_REACT_DEV_SERVER=ON`.
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the implementation plan, current status and
+checklist.
+
 ## Requirements
 
 Building on Windows uses WSL2 and a PacBrew rootfs with the OpenOrbis toolchain
