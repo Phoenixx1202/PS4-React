@@ -152,23 +152,31 @@ void exit_app() {
 
     // LoadExec("exit") is rejected on some firmware, including the setup used
     // here (0x80a10005). The system's own close path takes the running app id.
+    log("system: GetAppIdOfBigApp");
     int app = sceSystemServiceGetAppIdOfBigApp();
-    if (app <= 0)
+    log("system: big app id=0x%08x", static_cast<unsigned>(app));
+    if (app <= 0) {
+        log("system: GetAppIdOfMiniApp");
         app = sceSystemServiceGetAppIdOfMiniApp();
+        log("system: mini app id=0x%08x", static_cast<unsigned>(app));
+    }
     if (app > 0) {
+        log("system: calling KillApp");
         const int killed = sceSystemServiceKillApp(
             static_cast<std::uint32_t>(app), -1, 0, 0);
-        log("system: KillApp(0x%08x)=0x%08x", static_cast<unsigned>(app),
-            static_cast<unsigned>(killed));
-        if (killed == 0)
-            park();
+        log("system: KillApp returned=0x%08x", static_cast<unsigned>(killed));
+        if (killed == 0) {
+            log("system: KillApp accepted; exiting process");
+            _exit(0);
+        }
     } else {
         log("system: no running app id");
     }
 
     const int result = sceSystemServiceLoadExec("exit", nullptr);
     log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
-    park();
+    log("system: exiting process after rejected close request");
+    _exit(0);
 }
 
 } // namespace ps4::system
