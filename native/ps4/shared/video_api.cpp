@@ -7,12 +7,14 @@
 
 #include "host_api.hpp"
 
+#include "audio/mixer.hpp"
 #include "system.hpp"
 
 #include <orbis/Sysmodule.h>
 #include <orbis/libkernel.h>
 
 #include <sys/types.h>
+#include <pthread.h>
 
 #include <algorithm>
 #include <atomic>
@@ -30,6 +32,9 @@ extern "C" {
 #include "software_backend.h"
 }
 
+void start_audio_thread();
+void stop_audio_thread();
+
 namespace {
 
 struct AvPlayerVideo {
@@ -39,10 +44,19 @@ struct AvPlayerVideo {
     char language_code[4];
 };
 
+struct AvPlayerAudio {
+    std::uint16_t channel_count;
+    std::uint8_t reserved[2];
+    std::uint32_t sample_rate;
+    std::uint32_t size;
+    char language_code[4];
+};
+
 struct AvPlayerStreamDetails {
     union {
         std::uint8_t reserved[16];
         AvPlayerVideo video;
+        AvPlayerAudio audio;
     };
 };
 
@@ -193,6 +207,7 @@ using StopFn = int (*)(void*);
 using CloseFn = int (*)(void*);
 using GetVideoDataFn = bool (*)(void*, AvPlayerFrameInfo*);
 using GetVideoDataExFn = bool (*)(void*, AvPlayerFrameInfoEx*);
+using GetAudioDataFn = bool (*)(void*, AvPlayerFrameInfo*);
 using IsActiveFn = bool (*)(void*);
 using PauseFn = int (*)(void*);
 using ResumeFn = int (*)(void*);
@@ -222,6 +237,7 @@ StopFn stop_ = nullptr;
 CloseFn close_ = nullptr;
 GetVideoDataFn get_video_ = nullptr;
 GetVideoDataExFn get_video_ex_ = nullptr;
+GetAudioDataFn get_audio_ = nullptr;
 IsActiveFn is_active_ = nullptr;
 PauseFn pause_ = nullptr;
 ResumeFn resume_ = nullptr;
@@ -254,6 +270,15 @@ Rect rect_{0, 0, 1920, 1080};
 std::atomic<int> event_code_{-1};
 std::atomic<bool> ready_event_{false};
 std::atomic<int> allocation_logs_{0};
+std::atomic<int> audio_logs_{0};
+
+hui::audio::StreamRing video_audio_deck(1u << 15);
+hui::audio::Mixer* video_mixer = nullptr;
+std::vector<std::uint8_t> audio_staging;
+std::vector<float> audio_resampled;
+std::atomic<bool> audio_thread_running_{false};
+pthread_t audio_thread_{};
+bool audio_thread_started_ = false;
 
 void event_callback(void*, int event, int, void*) {
     // Called by AvPlayer's controller thread. Only publish state here; the
@@ -405,6 +430,7 @@ bool load_player() {
         {"sceAvPlayerClose", reinterpret_cast<void**>(&close_)},
         {"sceAvPlayerGetVideoData", reinterpret_cast<void**>(&get_video_)},
         {"sceAvPlayerGetVideoDataEx", reinterpret_cast<void**>(&get_video_ex_)},
+        {"sceAvPlayerGetAudioData", reinterpret_cast<void**>(&get_audio_)},
         {"sceAvPlayerIsActive", reinterpret_cast<void**>(&is_active_)},
         {"sceAvPlayerPause", reinterpret_cast<void**>(&pause_)},
         {"sceAvPlayerResume", reinterpret_cast<void**>(&resume_)},
@@ -443,6 +469,7 @@ void reset_state() {
 
 void close_player() {
     if (player_) {
+        stop_audio_thread();
         if (stop_) stop_(player_);
         // The decoder and demuxer run on AvPlayer threads. Give Stop time to
         // shut them down before Close frees the player they reference.
@@ -450,6 +477,8 @@ void close_player() {
             ps4::system::sleep_us(10000);
         if (close_) close_(player_);
         player_ = nullptr;
+        video_audio_deck.drain();
+        if (video_mixer) video_mixer->set_stream_gain(1, 0, 0.05f);
         ps4::system::log("video: closed");
     }
     reset_state();
@@ -511,7 +540,10 @@ bool ps4_react_video_play(const char* path, int x, int y, int width, int height)
     // once the demuxer is ready. If no frame arrives shortly, try Start once.
     start_attempted_ = false;
     start_wait_us_ = ps4::system::monotonic_us();
+    start_audio_thread();
     video_used_ = true;
+    video_audio_deck.drain();
+    if (video_mixer) video_mixer->set_stream_gain(1, 1, 0.05f);
     path_ = path;
     rect_ = {x, y, width, height};
     paused_ = false;
@@ -601,6 +633,96 @@ void blit_nv12(const std::uint8_t* data, int source_width, int source_height, in
                          draw_x, draw_y);
         logged = true;
     }
+}
+
+void pump_audio(const AvPlayerFrameInfo& frame) {
+    if (!frame.p_data) return;
+    const AvPlayerAudio& audio = frame.details.audio;
+    const int channels = audio.channel_count ? static_cast<int>(audio.channel_count) : 2;
+    const int rate = audio.sample_rate ? static_cast<int>(audio.sample_rate) : 48000;
+    const std::size_t bytes = audio.size;
+    if (bytes == 0) return;
+
+    const int index = audio_logs_.fetch_add(1);
+    if (index < 6) {
+        const auto* raw = static_cast<const std::uint8_t*>(frame.p_data);
+        ps4::system::log("video: audio %d ch=%d rate=%d size=%zu ts=%llu bytes=%02x%02x%02x%02x",
+                         index, channels, rate, bytes,
+                         static_cast<unsigned long long>(frame.timestamp), raw[0], raw[1],
+                         raw[2], raw[3]);
+    }
+
+    audio_staging.resize(bytes);
+    std::memcpy(audio_staging.data(), frame.p_data, bytes);
+    const auto* pcm = reinterpret_cast<const std::int16_t*>(audio_staging.data());
+    const std::size_t input_frames = bytes / (sizeof(std::int16_t) * channels);
+    if (input_frames == 0) return;
+    const std::size_t output_frames =
+        rate == 48000 ? input_frames
+                      : static_cast<std::size_t>(static_cast<std::uint64_t>(input_frames) * 48000 /
+                                                 static_cast<std::uint64_t>(rate));
+    if (output_frames == 0) return;
+
+    audio_resampled.resize(output_frames * 2);
+    for (std::size_t i = 0; i < output_frames; ++i) {
+        std::size_t source = rate == 48000
+                                 ? i
+                                 : static_cast<std::size_t>(static_cast<std::uint64_t>(i) * rate /
+                                                            static_cast<std::uint64_t>(48000));
+        if (source >= input_frames) source = input_frames - 1;
+        const float left = static_cast<float>(pcm[source * channels]) / 32768.0f;
+        const float right = channels > 1 ? static_cast<float>(pcm[source * channels + 1]) / 32768.0f
+                                         : left;
+        audio_resampled[i * 2] = left;
+        audio_resampled[i * 2 + 1] = right;
+    }
+
+    std::size_t offset = 0;
+    while (offset < output_frames) {
+        const std::size_t written =
+            video_audio_deck.write(audio_resampled.data() + offset * 2, output_frames - offset);
+        if (written == 0) break;
+        offset += written;
+    }
+}
+
+void* audio_thread_main(void*) {
+    while (audio_thread_running_.load(std::memory_order_relaxed)) {
+        bool received = false;
+        for (int i = 0; i < 8; ++i) {
+            AvPlayerFrameInfo frame{};
+            if (!player_ || !get_audio_ || !get_audio_(player_, &frame) || !frame.p_data) break;
+            pump_audio(frame);
+            received = true;
+        }
+        ps4::system::sleep_us(received ? 1000 : 5000);
+    }
+    return nullptr;
+}
+
+void start_audio_thread() {
+    if (audio_thread_started_) return;
+    audio_thread_running_.store(true);
+    pthread_attr_t attributes;
+    if (pthread_attr_init(&attributes) != 0) {
+        audio_thread_running_.store(false);
+        return;
+    }
+    pthread_attr_setstacksize(&attributes, 1024 * 1024);
+    audio_thread_started_ =
+        pthread_create(&audio_thread_, &attributes, audio_thread_main, nullptr) == 0;
+    pthread_attr_destroy(&attributes);
+    if (!audio_thread_started_) {
+        audio_thread_running_.store(false);
+        ps4::system::log("video: audio thread creation failed");
+    }
+}
+
+void stop_audio_thread() {
+    if (!audio_thread_started_) return;
+    audio_thread_running_.store(false);
+    pthread_join(audio_thread_, nullptr);
+    audio_thread_started_ = false;
 }
 
 void ps4_react_video_pump() {
@@ -705,6 +827,12 @@ bool ps4_react_video_used() {
     return video_used_;
 }
 
+void ps4_react_video_attach(hui::audio::Mixer& target) {
+    video_mixer = &target;
+    target.attach_stream(1, &video_audio_deck);
+    target.set_stream_gain(1, 1, 0);
+}
+
 void ps4_react_video_shutdown() {
     close_player();
     // Unload the modules while the process is still ours. The decoder's GPU
@@ -758,16 +886,18 @@ JSValue play(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
 
 JSValue pause(JSContext* ctx, JSValueConst, int, JSValueConst*) {
     if (!player_ || !pause_) return JS_NewBool(ctx, false);
-    const bool ok = pause_(player_) >= 0;
-    if (ok) paused_ = true;
-    return JS_NewBool(ctx, ok);
+    const int rc = pause_(player_);
+    ps4::system::log("video: pause rc=0x%08x", static_cast<unsigned>(rc));
+    if (rc >= 0) paused_ = true;
+    return JS_NewBool(ctx, rc >= 0);
 }
 
 JSValue resume(JSContext* ctx, JSValueConst, int, JSValueConst*) {
     if (!player_ || !resume_) return JS_NewBool(ctx, false);
-    const bool ok = resume_(player_) >= 0;
-    if (ok) paused_ = false;
-    return JS_NewBool(ctx, ok);
+    const int rc = resume_(player_);
+    ps4::system::log("video: resume rc=0x%08x", static_cast<unsigned>(rc));
+    if (rc >= 0) paused_ = false;
+    return JS_NewBool(ctx, rc >= 0);
 }
 
 JSValue seek(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {

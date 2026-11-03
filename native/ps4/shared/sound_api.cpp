@@ -94,6 +94,7 @@ bool ps4_react_start_sound() {
     sound.duration_us = static_cast<std::int64_t>(baked.frames) * 1000000 / baked.rate;
   }
   ps4_react_music_attach(mixer);
+  ps4_react_video_attach(mixer);
   audio = host::start_audio(mixer);
   return audio;
 }

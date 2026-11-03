@@ -33,9 +33,9 @@ The default build produces a single installable package:
 - **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
 - **Music** playback: MP3 decoding, 48 kHz resampling and the mixer's music
   deck (local files; HTTP streaming is pending).
-- **Video** playback through `sceAvPlayer` (local MP4/H.264, NV12 with
-  pitch/crop, ARGB blit at 30 fps for 480p). Audio, 720p/1080p and the GPU
-  texture path are pending.
+- **Video** playback through `sceAvPlayer` (local MP4/H.264 + AAC, NV12 with
+  pitch/crop, ARGB blit at 30 fps for 480p, audio through the mixer on a
+  dedicated thread). 720p/1080p and the GPU texture path are pending.
 - **GPU presentation** through Piglet/OpenGL ES (`"gpu": true`) using Sony's
   precompiled texmap shaders, with the software VideoOut path as fallback.
 - **Multi-controller input** with one pad per logged-in user and
@@ -198,7 +198,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
 `BrowserCapture` is not part of the PS4 runtime. Music streaming is not
-implemented yet. Video currently targets 480p with CPU NV12 conversion; audio,
+implemented yet. Video currently targets 480p with CPU NV12 conversion;
 720p/1080p and the GPU texture path are pending.
 
 Save data and the system keyboard are available from the same import:

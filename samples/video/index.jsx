@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {AppRegistry, View, Text, FocusScope, Video} from '@ps4-react/core';
 import font from '../assets/Inter-Regular.ttf';
+import tick from './tick.wav';
 
 const SOURCE = '/data/pkg/sample.mp4';
 const INITIAL_RECT = {x: 480, y: 220, width: 960, height: 540};
@@ -111,7 +112,7 @@ function App() {
           <Button label="Stop" disabled={!track} onPress={stop} />
         </View>
         <Text style={{fontFamily: font, fontSize: 22, color: '#5c6b78'}}>
-          Put an H.264 MP4 at {SOURCE}
+          Put an H.264/AAC MP4 at {SOURCE} · {tick}
         </Text>
       </View>
     </FocusScope>

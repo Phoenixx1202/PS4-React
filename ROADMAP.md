@@ -212,7 +212,10 @@ CPU baixa. MP3 local validado; stream HTTP, OGG/Opus e crossfade pendentes.
 - [x] API `Video` (play/pause/resume/seek/stop/setRect/status) e sample
   `video` com overlay no framebuffer do engine; falta o componente `<Video>`;
 - [x] controle play/pause/resume/seek (ms)/stop e fechamento limpo pelo
-  handshake `sceSystemServiceLoadExec("exit", nullptr)`; áudio ainda pendente;
+  handshake `sceSystemServiceLoadExec("exit", nullptr)`;
+- [x] áudio AAC: `sceAvPlayerGetAudioData` (mono S16 48 kHz) convertido para o
+  mixer em um thread dedicado, com resample linear; pause/resume acompanham o
+  áudio. Qualidade contínua validada no hardware;
 - [ ] 720p/1080p: o custo atual é a conversão NV12→ARGB na CPU; o decoder de
   hardware exige `libSceGnmDriver` e não pode fechar por `KillApp` (suspend
   timeout), por isso a saída usa o handshake `LoadExec("exit")`;
@@ -475,7 +478,10 @@ firmware/GoldHEN:
   oficial `sceSystemServiceLoadExec("exit", nullptr)`. Seek em milissegundos,
   pause/resume/stop e fechamento validados no hardware; PKG
   `f4cb215b77cc84c3b42b61548c8427149446b76c8f4924d3e069fccc2804d839`.
-  Áudio AAC, 720p/1080p e textura GPU pendentes. Sem push.
+  Áudio AAC (mono S16 48 kHz) implementado e ligado ao mixer em thread
+  dedicado; pause/resume/seek/fechamento validados com áudio, PKG
+  `b1b1fde6b9368fa4244d0610b50114022ead39796fa63770d8759e3b62ada9a9`.
+  720p/1080p e textura GPU/YUV pendentes. Sem push.
 ```
 
 ## Changelog do plano

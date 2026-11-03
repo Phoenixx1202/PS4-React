@@ -216,6 +216,7 @@ void ps4_react_video_pump();
 void ps4_react_video_stop();
 void ps4_react_video_shutdown();
 bool ps4_react_video_used();
+void ps4_react_video_attach(hui::audio::Mixer& mixer);
 
 // ABI v5 additive archive tasks: extract(sources, destination, maxBytes, password?), inspect(sources), cancel(id), poll().
 JSValue ps4_react_archive_api(JSContext* ctx);
