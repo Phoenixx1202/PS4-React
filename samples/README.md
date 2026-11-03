@@ -48,7 +48,7 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `files` | `FileSystem.writeFile`, `readFile` and `readDir` under `/download0` |
 | `settings` | `SaveData.mount` and `Keyboard.prompt`, persisting JSON in save data |
 | `dialogs` | `Dialog.alert` and `Dialog.confirm` through the system message dialog |
-| `packages` | `Packages.install`/`Packages.uninstall` with progress and errors |
+| `packages` | `Packages.install`/`Packages.uninstall` with progress and errors; the sample is packaged as a privileged app |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
 font sizes each app uses.

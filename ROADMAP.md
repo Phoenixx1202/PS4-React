@@ -92,14 +92,24 @@ hardware; barra de progresso pendente.
 
 ### 1.3 `Packages` completo
 
-- [ ] validar instalação real de um sample PKG em `/data/pkg`;
-- [ ] progresso, cancelamento, erros e título instalado no JS;
-- [ ] `Packages.uninstall` com `sceAppInstUtilAppUnInstall`;
-- [ ] instalar por cima, desinstalar e reabrir;
+- [x] validar instalação real de um sample PKG em `/data/pkg` (counter via BGFT);
+- [x] progresso, erros e título instalado no JS; cancelamento implementado, mas
+  ainda sem teste de hardware;
+- [x] `Packages.uninstall` com `sceAppInstUtilAppUnInstall`;
+- [x] instalar por cima, desinstalar e reabrir;
 - [ ] teste com PKG grande e PKG inválido.
 
+**Requisito de empacotamento:** `libSceAppInstUtil` só é liberada para apps
+privilegiados e o GoldHEN transforma imports não resolvidos em crash. O app
+precisa de `"privileged": true` (content ID `IV0000`, `CATEGORY=gde`,
+`ATTRIBUTE=32`, SELF `paid 0x3800000000000011`), carregar
+`libSceAppInstUtil`/`libSceBgft` por `sceSysmoduleLoadModuleInternal` e resolver
+as funções com `sceKernelDlsym`. A instalação usa o BGFT
+(`sceBgftServiceIntDownloadRegisterTaskByStorageEx`), não
+`sceAppInstUtilAppInstallPkg`.
+
 **Aceite:** instalar/desinstalar um sample sem crash e com estado correto no
-app.db.
+app.db. Validado no hardware; PKG grande e inválido pendentes.
 
 ### 1.4 Relaunch
 
@@ -338,6 +348,16 @@ firmware/GoldHEN:
   93a23790d01a7925156bd7c6eb786cfd61aa38b054a812f9e58d906ca9eb9e65.
   `OnResume` não é entregue por este firmware; o poll de status cobre.
   Exit após resume ainda a confirmar. Sem push.
+- 2026-11-03 - exit após resume confirmado no hardware: Options ->
+  `GetAppInfo` -> kill, sandbox removido, sem coredump.
+- 2026-11-03 - `Packages` validado no hardware (PS4 5.05/GoldHEN, sample
+  packages): instalação do counter por BGFT após carregar
+  `libSceAppInstUtil`/`libSceBgft` com `sceSysmoduleLoadModuleInternal`,
+  instalar por cima e desinstalar com `sceAppInstUtilAppUnInstall`; PKG
+  `0ee1b0ba5e54aa3a1a9d657b0c3b076a01703fdecceff654a85cc856b4f9c0e9`,
+  counter `35e2029a403843994edc8c5cbfeb383f8341deba1a758f964a534477ff7adbcd`.
+  Log: `packages: installed CUSA99060 from /data/pkg/PS4-React-counter.pkg`
+  e `packages: uninstalled CUSA99060`. Commit local `783c23a`, sem push.
 ```
 
 ## Changelog do plano

@@ -24,8 +24,9 @@ The default build produces a single installable package:
 - **Runtime text shaping** for CJK, Arabic and Indic scripts with HarfBuzz and
   SheenBidi; apps package only the Noto fonts they use.
 - **Native filesystem** under `/app0`, `/data` and `/download0`.
-- **PKG installation and removal** through `sceAppInstUtil` via
-  `Packages.install`/`Packages.uninstall`, with progress and errors.
+- **PKG installation and removal** through the BGFT install service via
+  `Packages.install`/`Packages.uninstall`, with progress and errors. Apps that
+  use it are packaged with `"privileged": true` (`IV0000`/`gde`).
 - **Save data** through `sceSaveData` and the system on-screen keyboard through
   `sceImeDialog`.
 - **PKG packaging** validated with `PkgTool.Core` and a load-image checker.
@@ -167,8 +168,8 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Notifications` / `Users` / `DeviceInfo` | Notifications, users and device information |
 | `FileSystem` | Read, write, list, rename and inspect files |
 | `Controller` / `useGamepad` | Light bar, vibration and pad state |
-| `Packages.install` | Install a PKG through `sceAppInstUtil` |
-| `Packages.uninstall` | Remove an installed title through `sceAppInstUtil` |
+| `Packages.install` | Install a PKG through BGFT; requires a privileged app |
+| `Packages.uninstall` | Remove a title through `sceAppInstUtil`; requires a privileged app |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Dialog` | System message dialogs (`alert` and `confirm`) |
@@ -241,8 +242,9 @@ Known limitations:
 
 - RAR/RAR5 extraction is not available yet; ZIP/TAR/7z are supported.
 - Music streaming is not implemented yet.
-- `Packages.install` uses system services and still needs validation on the
-  firmware versions you target.
+- `Packages` requires an app packaged with `"privileged": true`; it loads the
+  internal AppInstUtil/BGFT sysmodules and installs through BGFT. Validated on
+  the target PS4 5.05/GoldHEN console; large and invalid PKGs are untested.
 - Runtime text shaping needs the app to package the Noto fonts it uses.
 - Hot reload only replaces JavaScript; asset changes require a new PKG.
 
