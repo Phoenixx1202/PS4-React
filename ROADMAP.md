@@ -154,9 +154,10 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 ### 1.8 Rede avançada
 
 - [ ] WebSocket cliente (texto/binário, ping/pong, reconexão);
-- [ ] SSE/streaming HTTP para respostas longas (cliente `Sse` implementado,
-  com fila limitada a 256 eventos; falta validação de hardware);
-- [ ] limites de memória e backpressure;
+- [x] SSE/streaming HTTP para respostas longas (cliente `Sse` validado com
+  servidor local; fila limitada a 256 eventos);
+- [ ] limites de memória e backpressure (fila limitada implementada; falta
+  teste de carga);
 - [ ] servidor de teste local e testes automatizados (teste JS de `Sse` feito).
 
 ### 1.9 Arquivos compactados
@@ -406,6 +407,12 @@ firmware/GoldHEN:
   retry. PKGs `26fdb4bf265c3093421bc3cd4dfdc22dd3b8c596ac26ee2f85d74f4453b5bd0a`
   e `6c60a439a73f204c121ac944ec95dec60eafce08f5fa3a42b3b097f79e62348f`;
   commits locais `b3087c5` e `0c69890`.
+- 2026-11-03 - SSE validado no hardware (sample sse, PKG
+  `d0e0960f7118955baa99a20943d86d73c49933e8d265a5e2d98a55672d9ecba0`):
+  `sse: connecting http://192.168.0.8:8765/events` -> `poll state=open` ->
+  `closed`, com os eventos `tick` exibidos. Endpoint público fechou sem
+  entregar eventos, então o teste usou um servidor local no PC. Commit local
+  `b185c07`.
 ```
 
 ## Changelog do plano
