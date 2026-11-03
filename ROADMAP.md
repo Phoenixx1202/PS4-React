@@ -195,14 +195,14 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 - [x] decoder MP3 (minimp3) com resample para 48 kHz; OGG/Opus pendentes;
 - [ ] `Music.play(file|url)`, pause/resume/seek/volume: arquivo local,
-  pause/resume/volume e stop implementados; URL/streaming e seek pendentes;
+  pause/resume/volume e stop validados; URL/streaming e seek pendentes;
 - [ ] playlists, crossfade e metadados (título/artista/capa);
 - [ ] usar os dois decks e o `stream_ring` existentes no mixer (um deck usado);
 - [ ] BGM do sistema (`sceMusicPlayerService`) quando disponível;
-- [ ] sample `music` (criado; teste de hardware pendente).
+- [x] sample `music` (MP3 local validado no hardware).
 
 **Aceite:** tocar MP3 local e stream HTTP com crossfade, sem underrun e com
-CPU baixa.
+CPU baixa. MP3 local validado; stream HTTP, OGG/Opus e crossfade pendentes.
 
 ### 2.2 Vídeo
 
@@ -423,6 +423,11 @@ firmware/GoldHEN:
   `websocket: open ws://192.168.0.8:8766/` -> `poll state=open` -> envio
   `hello ...` ecoado e `closed`. Commit local `91d74e9`. Binário de saída e
   reconexão automática pendentes.
+- 2026-11-03 - música MP3 local validada no hardware (sample music, PKG
+  `a8959029ad4a62334f5c0d8641aac823376ccd555d89ad6087265570fb00b98a`):
+  `music: /data/pkg/music.mp3 44100 Hz 2 ch, 16436736 frames`, play/pause/
+  resume/stop/volume funcionaram. Commit local `59346e9`. OGG/Opus, HTTP,
+  seek, playlists/crossfade e metadados pendentes.
 ```
 
 ## Changelog do plano
