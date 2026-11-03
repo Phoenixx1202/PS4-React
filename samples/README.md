@@ -18,6 +18,7 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample archive
 .\tools\build_ps4.ps1 -Sample device
 .\tools\build_ps4.ps1 -Sample audio
+.\tools\build_ps4.ps1 -Sample downloads
 ```
 
 On Linux:
@@ -57,6 +58,7 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `archive` | `Archives.create` ZIP, `Archives.extract` and `Archives.inspect` |
 | `device` | `DeviceInfo`, `Users` and `Notifications` |
 | `audio` | Baked WAV playback with `Sound.play`, volume and pan |
+| `downloads` | `Downloads.enqueue` progress, cancel and retry |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
 font sizes each app uses.
