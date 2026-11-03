@@ -214,14 +214,17 @@ Validated on PS4 hardware:
 - downloads to `/download0` with completion receipts and resume;
 - remote PNG decode at 256×256;
 - ZIP extraction with two entries;
-- Japanese, Simplified Chinese and Arabic shaping at 59.9 fps.
+- Japanese, Simplified Chinese and Arabic shaping at 59.9 fps;
+- PS4 save-data mount and broken-directory recovery, with JSON persistence
+  through the `settings` sample;
+- the system on-screen keyboard feeding text back into React.
 
 Known limitations:
 
 - RAR/RAR5 extraction is not available yet; ZIP/TAR/7z are supported.
 - Message dialogs and music streaming are not implemented yet.
-- `Packages.install`, `SaveData` and `Keyboard.prompt` use system services and
-  still need validation on the firmware versions you target.
+- `Packages.install` uses system services and still needs validation on the
+  firmware versions you target.
 - Runtime text shaping needs the app to package the Noto fonts it uses.
 - Hot reload only replaces JavaScript; asset changes require a new PKG.
 
