@@ -174,7 +174,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Payloads` | Check GoldHEN BinLoader and send an ELF payload to 127.0.0.1:9090 |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
-| `Dialog` | System message dialogs (`alert` and `confirm`) |
+| `Dialog` | System message dialogs (`alert`, `confirm` and `progress`) |
 | `AppState` | App lifecycle state and system events (resume, URL open, focus) |
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 

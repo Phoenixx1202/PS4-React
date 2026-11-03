@@ -79,7 +79,8 @@ recebe os eventos. Background/active e save data validados; rest mode direto e
 ### 1.2 Diálogos do sistema
 
 - [x] `Dialog.alert`/`Dialog.confirm` via `sceMsgDialog`;
-- [ ] barra de progresso (`sceMsgDialogProgressBar*`);
+- [x] barra de progresso (`sceMsgDialogProgressBar*`) com `Dialog.progress`
+  (validada no sample dialogs);
 - [x] ciclo `sceMsgDialogInitialize/Open/GetStatus/GetResult/Terminate`;
 - [x] ignorar o pad do app enquanto o diálogo ou o IME está aberto
   (tratamento de suspend/foco fica na 1.1);
@@ -87,8 +88,8 @@ recebe os eventos. Background/active e save data validados; rest mode direto e
 - [x] sample `dialogs`.
 
 **Aceite:** abrir, confirmar, cancelar e fechar; sem travar o render; mensagem
-de erro do host consegue usar o diálogo do sistema. Núcleo validado no
-hardware; barra de progresso pendente.
+de erro do host consegue usar o diálogo do sistema. Núcleo e barra de progresso
+validados no hardware.
 
 ### 1.3 `Packages` completo
 
@@ -128,10 +129,13 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 - [x] desmontar no background e remontar no active/resume (validado; o suspend
   block do `SceSaveData` deixa de travar o suspend do sistema);
-- [ ] adicionar `save_data.png` em `sce_sys` (o KLog acusa ausente);
-- [ ] ícone, título e subtítulo no diálogo de save;
+- [x] adicionar `save_data.png` em `sce_sys` (validado; o KLog não acusa mais
+  ausente);
+- [x] ícone, título e subtítulo no diálogo de save (`SaveData.mount` recebe
+  `title`/`subtitle` e o ícone vem de `sce_sys/save_data.png`);
 - [ ] tratar crash sem deixar mount pendurado;
-- [ ] limite de mounts e mensagens de erro melhores.
+- [ ] limite de mounts e mensagens de erro melhores (limite de 8 implementado,
+  sem teste de hardware).
 
 ### 1.6 Fontes e texto
 
@@ -376,6 +380,13 @@ firmware/GoldHEN:
   derrubar o accept loop do BinLoader, então o envio é o teste real. PKG
   `8318d7fd67dc8b0075e3fb3f819641c7eb992c4c0fae231ff1172dc4bf70a5ee`,
   commit local `7bca09e`, sem push.
+- 2026-11-03 - barra de progresso do Dialog validada no hardware (sample
+  dialogs, PKG `fcb61825c4d83f9c4ad603da5bab5daf04ddf6cd410638fad3019bb00e426d9b`);
+  commit local `9d72fc2`.
+- 2026-11-03 - save data com `sce_sys/save_data.png` validado no hardware
+  (settings, PKG `23b166e533fbf693d27c64a73c5840cc98ddc79a193b7ee1f045583408bc6133`):
+  KLog mostra `Mounted > ... mountPoint=/savedata0`, unmount no close e não
+  acusa mais `save_data.png` ausente. Commit local `475b9b2`.
 ```
 
 ## Changelog do plano
