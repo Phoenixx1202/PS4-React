@@ -1,5 +1,6 @@
 #include "system.hpp"
 
+#include <orbis/CommonDialog.h>
 #include <orbis/Sysmodule.h>
 #include <orbis/SystemService.h>
 #include <orbis/UserService.h>
@@ -29,6 +30,8 @@ constexpr std::uint32_t kAudioOut = 0x80000001;
 constexpr std::uint32_t kNet = 0x8000001C;
 constexpr std::uint32_t kNetCtl = 0x80000009;
 constexpr std::uint32_t kVideoOut = 0x80000022;
+constexpr std::uint32_t kSaveData = 0x8000000F;
+constexpr std::uint32_t kCommonDialog = 0x80000018;
 
 } // namespace
 
@@ -90,6 +93,8 @@ bool initialize_services() {
         {kNet, "net"},
         {kNetCtl, "netctl"},
         {kVideoOut, "videoout"},
+        {kSaveData, "savedata"},
+        {kCommonDialog, "common_dialog"},
     };
     // Rootfs OpenOrbis declares the parameter as enum OrbisSysModuleInternal;
     // older headers use uint32_t. Both are the same 32-bit ABI here.
@@ -105,6 +110,14 @@ bool initialize_services() {
     parameters.priority = ORBIS_KERNEL_PRIO_FIFO_LOWEST;
     const int user = sceUserServiceInitialize(&parameters);
     log("service: user init=0x%08x", static_cast<unsigned>(user));
+
+    // IME is a public system module, unlike the internal SaveData and
+    // CommonDialog modules above. The common dialog must be initialized
+    // before sceImeDialogInit.
+    const int ime = sceSysmoduleLoadModule(ORBIS_SYSMODULE_IME_DIALOG);
+    log("service: ime_dialog=0x%08x", static_cast<unsigned>(ime));
+    const int common = sceCommonDialogInitialize();
+    log("service: common dialog init=0x%08x", static_cast<unsigned>(common));
 
     initialized = true;
     return true;
