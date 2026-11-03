@@ -258,13 +258,17 @@ int main() {
             tracker.update(std::span<const hui::PadSample>(samples, count), now);
         ps4_react_set_gamepad(gamepad_state(input));
 
-        if (input.is_pressed(hui::Action::menu)) {
-            ps4::system::log("PS4 React Starter: Options pressed; exiting");
-            break;
+        // A system dialog or the on-screen keyboard owns the pad while it is
+        // open. Do not also dispatch those presses to the React tree.
+        if (!ps4_react_system_dialog_active()) {
+            if (input.is_pressed(hui::Action::menu)) {
+                ps4::system::log("PS4 React Starter: Options pressed; exiting");
+                break;
+            }
+            if (const char* action = nav_action(input.nav)) dispatch(action);
+            for (const auto& [button, action] : kExtraActions)
+                if (input.is_pressed(button)) dispatch(action_name(action));
         }
-        if (const char* action = nav_action(input.nav)) dispatch(action);
-        for (const auto& [button, action] : kExtraActions)
-            if (input.is_pressed(button)) dispatch(action_name(action));
 
 #if defined(PS4_REACT_DEV_SERVER)
         const std::uint8_t* reload = nullptr;

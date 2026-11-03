@@ -499,6 +499,7 @@ void ps4_react_install_host_api(JSContext* ctx) {
   JS_SetPropertyStr(ctx, api, "packages", ps4_react_package_api(ctx));
   JS_SetPropertyStr(ctx, api, "saveData", ps4_react_save_data_api(ctx));
   JS_SetPropertyStr(ctx, api, "ime", ps4_react_ime_api(ctx));
+  JS_SetPropertyStr(ctx, api, "dialog", ps4_react_dialog_api(ctx));
   JS_SetPropertyStr(ctx, api, "image", ps4_react_image_api(ctx));
   JS_SetPropertyStr(ctx, api, "sound", ps4_react_sound_api(ctx));
   JSValue global = JS_GetGlobalObject(ctx);
@@ -508,6 +509,10 @@ void ps4_react_install_host_api(JSContext* ctx) {
 
 bool ps4_react_exit_requested() {
   return exit_requested;
+}
+
+bool ps4_react_system_dialog_active() {
+  return ps4_react_dialog_active() || ps4_react_ime_active();
 }
 
 void ps4_react_set_gamepad(const GamepadState& state) {

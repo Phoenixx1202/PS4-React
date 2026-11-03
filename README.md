@@ -169,10 +169,11 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Packages.install` | Install a PKG through `sceAppInstUtil` |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
+| `Dialog` | System message dialogs (`alert` and `confirm`) |
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
-`Payloads` and `BrowserCapture` are not part of the PS4 runtime. Message
-dialogs and music streaming are not implemented yet.
+`Payloads` and `BrowserCapture` are not part of the PS4 runtime. Music
+streaming is not implemented yet.
 
 Save data and the system keyboard are available from the same import:
 
@@ -232,7 +233,7 @@ Validated on PS4 hardware:
 Known limitations:
 
 - RAR/RAR5 extraction is not available yet; ZIP/TAR/7z are supported.
-- Message dialogs and music streaming are not implemented yet.
+- Music streaming is not implemented yet.
 - `Packages.install` uses system services and still needs validation on the
   firmware versions you target.
 - Runtime text shaping needs the app to package the Noto fonts it uses.

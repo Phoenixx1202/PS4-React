@@ -59,6 +59,7 @@ add_executable(ps4_react_starter
     ../shared/package_api.cpp
     ../shared/save_data_api.cpp
     ../shared/ime_api.cpp
+    ../shared/dialog_api.cpp
     ../shared/text_shaper.cpp
     ../third_party/sheenbidi/Source/SheenBidi.c
     ../audio_out.cpp
@@ -137,6 +138,7 @@ target_link_libraries(ps4_react_starter PRIVATE
     SceAppInstUtil
     SceSaveData
     SceCommonDialog
+    SceMsgDialog
     SceImeDialog
     SceVideoOut
     ScePad

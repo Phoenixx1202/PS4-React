@@ -213,3 +213,11 @@ JSValue ps4_react_archive_api(JSContext* ctx);
 JSValue ps4_react_package_api(JSContext* ctx);
 JSValue ps4_react_save_data_api(JSContext* ctx);
 JSValue ps4_react_ime_api(JSContext* ctx);
+
+// ABI v7: system message dialogs. The render thread keeps running and
+// JavaScript polls the dialog like the network tasks.
+JSValue ps4_react_dialog_api(JSContext* ctx);
+bool ps4_react_dialog_active();
+bool ps4_react_ime_active();
+// True while either a message dialog or the on-screen keyboard owns input.
+bool ps4_react_system_dialog_active();

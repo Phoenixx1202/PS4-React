@@ -246,3 +246,8 @@ JSValue ps4_react_ime_api(JSContext* ctx) {
     JS_SetPropertyStr(ctx, api, "poll", JS_NewCFunction(ctx, poll, "poll", 0));
     return api;
 }
+
+bool ps4_react_ime_active() {
+    std::lock_guard<std::mutex> lock(task_mutex);
+    return active && active->state == State::running;
+}

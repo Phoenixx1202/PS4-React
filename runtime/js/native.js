@@ -243,6 +243,33 @@ export const Keyboard = {
   },
 };
 
+/**
+ * System message dialogs. `alert` resolves with the pressed button id (1 for
+ * OK); `confirm` resolves with true for Yes/OK and false for No/Cancel. Both
+ * reject with an error when the dialog cannot be opened. The render loop keeps
+ * running and the host ignores pad presses while the dialog is open.
+ */
+export const Dialog = {
+  /**
+   * @param {{title?: string, message?: string}} [options]
+   * @returns {Promise<number>}
+   */
+  async alert({title = '', message = ''} = {}) {
+    const id = host().dialog.start(title, message, false);
+    const snapshot = await networkTask(id, 'Dialog.alert', '', 'dialog').done;
+    return snapshot.buttonId;
+  },
+  /**
+   * @param {{title?: string, message?: string}} [options]
+   * @returns {Promise<boolean>}
+   */
+  async confirm({title = '', message = ''} = {}) {
+    const id = host().dialog.start(title, message, true);
+    const snapshot = await networkTask(id, 'Dialog.confirm', '', 'dialog').done;
+    return snapshot.confirmed === true;
+  },
+};
+
 export const BackHandler = {
   /**
    * Closes the app after the current frame, like React Native's BackHandler.exitApp. With `relaunch`,
