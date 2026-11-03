@@ -120,8 +120,12 @@ void trace(const char* call) {
 }
 
 bool arrange_relaunch(char* error, std::size_t size) {
+    int result = 0;
+    if (ps4::system::relaunch(result))
+        return true;
     if (error && size)
-        std::snprintf(error, size, "relaunch is not implemented on PS4 yet");
+        std::snprintf(error, size, "sceLncUtilLaunchApp failed (0x%08x)",
+                      static_cast<unsigned>(result));
     return false;
 }
 

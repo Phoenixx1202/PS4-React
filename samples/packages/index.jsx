@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {AppRegistry, View, Text, FocusScope, Packages} from '@ps4-react/core';
+import {AppRegistry, View, Text, FocusScope, BackHandler, Packages} from '@ps4-react/core';
 import font from '../assets/Inter-Regular.ttf';
 
 const PKG = '/data/pkg/PS4-React-counter.pkg';
@@ -71,6 +71,11 @@ function App() {
 
   const install = () => run('Install', () => Packages.install({path: PKG, overwrite: true}));
   const uninstall = () => run('Uninstall', () => Packages.uninstall({titleId: TITLE_ID}));
+  const relaunch = () => {
+    setStatus('Relaunching...');
+    setError('');
+    BackHandler.exitApp({relaunch: true});
+  };
 
   return (
     <FocusScope wrap>
@@ -94,6 +99,7 @@ function App() {
         )}
         <Button label="Install counter PKG" autoFocus disabled={busy} onPress={install} />
         <Button label="Uninstall counter title" disabled={busy} onPress={uninstall} />
+        <Button label="Relaunch app" disabled={busy} onPress={relaunch} />
         <Text style={{fontFamily: font, fontSize: 25, color: '#a0c4ff'}}>
           D-pad: choose    Cross: confirm
         </Text>

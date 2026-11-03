@@ -29,4 +29,8 @@ void hide_splash();
 // info; GetAppIdOfBigApp fails inside a game on this firmware.
 bool request_close();
 
+// Queues the current title for launch through sceLncUtilLaunchApp. Call before
+// request_close(); the shell starts the new instance after this process exits.
+bool relaunch(int& result);
+
 } // namespace ps4::system

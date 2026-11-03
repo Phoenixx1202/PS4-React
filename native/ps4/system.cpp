@@ -146,6 +146,32 @@ void park() {
         sceKernelUsleep(100000);
 }
 
+bool relaunch(int& result) {
+    OrbisAppInfo info{};
+    const pid_t pid = getpid();
+    const int info_result = sceKernelGetAppInfo(pid, &info);
+    if (info_result != 0 || !info.TitleId[0]) {
+        result = info_result ? info_result : -1;
+        log("system: relaunch GetAppInfo(pid=%d)=0x%08x",
+            static_cast<int>(pid), static_cast<unsigned>(result));
+        return false;
+    }
+
+    int user = -1;
+    if (sceUserServiceGetForegroundUser(&user) != 0) user = 0;
+    LncAppParam param{};
+    param.size = sizeof param;
+    param.user_id = static_cast<std::uint32_t>(user);
+    param.app_opt = 0;
+    param.LaunchAppCheck_flag = LaunchApp_None;
+
+    result = sceLncUtilLaunchApp(info.TitleId, nullptr, &param);
+    log("system: LncUtilLaunchApp(%s pid=%d user=0x%08x)=0x%08x", info.TitleId,
+        static_cast<int>(pid), static_cast<unsigned>(user),
+        static_cast<unsigned>(result));
+    return result == 0;
+}
+
 bool request_close() {
     log("system: requesting title closure");
     std::fflush(nullptr);
