@@ -58,6 +58,26 @@ function App() {
     }
   };
 
+  const progress = () => {
+    try {
+      const dialog = Dialog.progress({title: 'Progress', message: 'Starting...'});
+      let value = 0;
+      const timer = setInterval(() => {
+        value = Math.min(100, value + 5);
+        dialog.set(value, `Step ${value}%`);
+        if (value >= 100) {
+          clearInterval(timer);
+          setTimeout(() => dialog.close(), 300);
+        }
+      }, 100);
+      dialog.done.then(() => setStatus('Progress closed.')).catch(error => {
+        setStatus(`Progress failed: ${error.message}`);
+      });
+    } catch (error) {
+      setStatus(`Progress failed: ${error.message}`);
+    }
+  };
+
   return (
     <FocusScope wrap>
       <View style={{
@@ -76,6 +96,7 @@ function App() {
         <View style={{flexDirection: 'row', gap: 24}}>
           <Button label="Alert" onPress={alert} autoFocus />
           <Button label="Confirm" onPress={confirm} />
+          <Button label="Progress" onPress={progress} />
         </View>
       </View>
     </FocusScope>

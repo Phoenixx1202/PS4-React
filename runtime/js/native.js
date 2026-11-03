@@ -268,6 +268,27 @@ export const Dialog = {
     const snapshot = await networkTask(id, 'Dialog.confirm', '', 'dialog').done;
     return snapshot.confirmed === true;
   },
+  /**
+   * Opens a system progress bar. `set(value, message)` updates 0..100;
+   * `close()` dismisses it; `done` resolves when the system closes the dialog.
+   * @param {{title?: string, message?: string}} [options]
+   * @returns {{id: number, done: Promise<object>, set: (value: number, message?: string) => void,
+   *   close: () => void}}
+   */
+  progress({title = '', message = ''} = {}) {
+    const id = host().dialog.startProgress(title, message);
+    const task = networkTask(id, 'Dialog.progress', '', 'dialog');
+    return Object.freeze({
+      id,
+      done: task.done,
+      set(value, text = '') {
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100)
+          throw new TypeError('Dialog.progress.set: value must be a number from 0 to 100');
+        host().dialog.progressSet(id, value, String(text));
+      },
+      close() { host().dialog.progressClose(id); },
+    });
+  },
 };
 
 export const BackHandler = {

@@ -26,9 +26,12 @@ struct Task {
     std::uint32_t id = 0;
     State state = State::running;
     bool confirm = false;
+    bool progress = false;
+    bool closing = false;
     std::string message;
     OrbisMsgDialogParam param{};
     OrbisMsgDialogUserMessageParam user{};
+    OrbisMsgDialogProgressBarParam bar{};
     int button = 0;
     std::string error;
 };
@@ -176,6 +179,75 @@ JSValue cancel(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     return JS_UNDEFINED;
 }
 
+JSValue start_progress(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    std::string title;
+    std::string message;
+    if (!read_string(ctx, argc > 0 ? argv[0] : JS_UNDEFINED, title) ||
+        !read_string(ctx, argc > 1 ? argv[1] : JS_UNDEFINED, message))
+        return JS_ThrowTypeError(ctx, "Dialog.progress: title and message must be strings");
+
+    std::lock_guard<std::mutex> lock(task_mutex);
+    if (active && active->state == State::running)
+        return JS_ThrowPlainError(ctx, "Dialog.progress: another dialog is already open");
+
+    auto task = std::make_shared<Task>();
+    task->id = next_id++;
+    task->progress = true;
+    if (!title.empty()) {
+        task->message = title;
+        task->message += "\n\n";
+    }
+    task->message += message;
+
+    (void)sceMsgDialogInitialize();
+    init_base_param(task->param.baseParam);
+    task->param.size = sizeof(OrbisMsgDialogParam);
+    task->param.mode = ORBIS_MSG_DIALOG_MODE_PROGRESS_BAR;
+    task->bar.barType = ORBIS_MSG_DIALOG_PROGRESSBAR_TYPE_PERCENTAGE;
+    task->bar.msg = task->message.c_str();
+    task->param.progBarParam = &task->bar;
+
+    const int opened = sceMsgDialogOpen(&task->param);
+    if (opened < 0) {
+        task->state = State::failed;
+        task->error = "sceMsgDialogOpen failed";
+        return throw_error(ctx, "Dialog.progress", opened);
+    }
+    active = task;
+    return JS_NewUint32(ctx, task->id);
+}
+
+JSValue progress_set(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    std::uint32_t id = 0;
+    double value = 0;
+    if (argc < 2 || JS_ToUint32(ctx, &id, argv[0]) || JS_ToFloat64(ctx, &value, argv[1]) ||
+        value < 0 || value > 100)
+        return JS_ThrowTypeError(ctx, "Dialog.progress.set: expected id and value 0..100");
+    std::string message;
+    if (argc > 2 && !read_string(ctx, argv[2], message))
+        return JS_ThrowTypeError(ctx, "Dialog.progress.set: message must be a string");
+
+    std::lock_guard<std::mutex> lock(task_mutex);
+    if (!active || active->id != id || !active->progress || active->state != State::running)
+        return JS_UNDEFINED;
+    if (!message.empty())
+        (void)sceMsgDialogProgressBarSetMsg(0, message.c_str());
+    (void)sceMsgDialogProgressBarSetValue(0, static_cast<std::uint32_t>(value));
+    return JS_UNDEFINED;
+}
+
+JSValue progress_close(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    std::uint32_t id = 0;
+    if (!argc || JS_ToUint32(ctx, &id, argv[0]))
+        return JS_ThrowTypeError(ctx, "Dialog.progress.close: expected a task id");
+    std::lock_guard<std::mutex> lock(task_mutex);
+    if (active && active->id == id && active->progress && !active->closing) {
+        active->closing = true;
+        (void)sceMsgDialogClose();
+    }
+    return JS_UNDEFINED;
+}
+
 } // namespace
 
 bool ps4_react_dialog_active() {
@@ -186,6 +258,9 @@ bool ps4_react_dialog_active() {
 JSValue ps4_react_dialog_api(JSContext* ctx) {
     JSValue api = JS_NewObject(ctx);
     JS_SetPropertyStr(ctx, api, "start", JS_NewCFunction(ctx, start, "start", 3));
+    JS_SetPropertyStr(ctx, api, "startProgress", JS_NewCFunction(ctx, start_progress, "startProgress", 2));
+    JS_SetPropertyStr(ctx, api, "progressSet", JS_NewCFunction(ctx, progress_set, "progressSet", 3));
+    JS_SetPropertyStr(ctx, api, "progressClose", JS_NewCFunction(ctx, progress_close, "progressClose", 1));
     JS_SetPropertyStr(ctx, api, "poll", JS_NewCFunction(ctx, poll, "poll", 0));
     JS_SetPropertyStr(ctx, api, "cancel", JS_NewCFunction(ctx, cancel, "cancel", 1));
     return api;

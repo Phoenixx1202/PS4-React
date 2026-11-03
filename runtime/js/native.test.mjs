@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound} from './native.js';
+import {acquireImage, Archives, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound} from './native.js';
 
 test('SaveData forwards mount, unmount and remove to the host', () => {
   assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
@@ -296,6 +296,36 @@ test('Payloads checks BinLoader and sends through a network task', async () => {
     tick();
     assert.equal((await task.done).state, 'completed');
     assert.throws(() => Payloads.send({}), /expected a payload path/);
+  } finally {
+    globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('Dialog.progress updates and closes the system bar', async () => {
+  let tick, snapshots = [];
+  const calls = [];
+  const originalInterval = globalThis.setInterval;
+  const originalClear = globalThis.clearInterval;
+  globalThis.setInterval = callback => { tick = callback; return 1; };
+  globalThis.clearInterval = () => {};
+  globalThis.__ps4ReactNative = {dialog: {
+    startProgress: (...args) => { calls.push(['start', ...args]); return 4; },
+    progressSet: (...args) => { calls.push(['set', ...args]); },
+    progressClose: id => { calls.push(['close', id]); },
+    poll: () => snapshots,
+  }};
+  try {
+    const dialog = Dialog.progress({title: 'Progress', message: 'Starting'});
+    assert.equal(dialog.id, 4);
+    assert.deepEqual(calls, [['start', 'Progress', 'Starting']]);
+    dialog.set(42, '42%');
+    dialog.close();
+    assert.deepEqual(calls.slice(1), [['set', 4, 42, '42%'], ['close', 4]]);
+    snapshots = [{id: 4, state: 'completed', error: ''}];
+    tick();
+    assert.equal((await dialog.done).state, 'completed');
+    assert.throws(() => dialog.set(101), /0 to 100/);
   } finally {
     globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
     delete globalThis.__ps4ReactNative;
