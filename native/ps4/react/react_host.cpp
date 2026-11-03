@@ -37,6 +37,7 @@ extern "C" const char app_bundle[];
 extern "C" const unsigned long app_bundle_length;
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -159,10 +160,22 @@ int main() {
         ps4::system::park();
     }
 
-    Pad pad;
-    const bool have_pad = pad.open();
-    if (have_pad) host::attach_pad(&pad);
-    ps4::system::log("PS4 React Starter: pad=%s", have_pad ? "yes" : "no");
+    std::array<Pad, 4> pads;
+    int pad_count = 0;
+    // Opening the first pad also initializes the user service, which the
+    // logged-in user enumeration needs.
+    if (pads[0].open()) pad_count = 1;
+    host::User users[4];
+    const int user_count = host::logged_in_users(users, 4);
+    if (user_count > 0) {
+        for (Pad& pad : pads) pad.close();
+        pad_count = 0;
+        for (int i = 0; i < user_count && i < 4; ++i)
+            if (pads[pad_count].open_for_user(users[i].id)) ++pad_count;
+    }
+    if (pad_count == 0 && pads[0].open()) pad_count = 1;
+    if (pad_count > 0) host::attach_pad(&pads[0]);
+    ps4::system::log("PS4 React Starter: pads=%d users=%d", pad_count, user_count);
 
     const bool have_audio = ps4_react_start_sound();
     ps4::system::log("PS4 React Starter: sound=%s", have_audio ? "yes" : "no");
@@ -236,7 +249,8 @@ int main() {
     if (!loaded) fatal("bundle failed to load");
 
     hui::InputTracker tracker;
-    OrbisPadData raw{};
+    std::array<hui::InputTracker, 4> pad_trackers;
+    std::array<OrbisPadData, 4> raw{};
     bool have_first_frame = false;
     std::int64_t previous = ps4::system::monotonic_us();
     std::int64_t fps_start = previous;
@@ -247,13 +261,24 @@ int main() {
         host::tick();
         ps4_react_app_state_pump();
         const std::int64_t now = ps4::system::monotonic_us();
-        hui::PadSample samples[1];
+        hui::PadSample samples[4];
         std::size_t count = 0;
-        if (have_pad && pad.read(raw)) samples[count++] = convert(raw);
+        for (int player = 0; player < pad_count; ++player) {
+            if (!pads[player].read(raw[player])) {
+                ps4_react_set_gamepad(player, GamepadState{});
+                continue;
+            }
+            samples[count] = convert(raw[player]);
+            const hui::InputFrame player_input = pad_trackers[player].update(
+                std::span<const hui::PadSample>(&samples[count], 1), now);
+            ps4_react_set_gamepad(player, gamepad_state(player_input));
+            ++count;
+        }
+        for (int player = pad_count; player < 4; ++player)
+            ps4_react_set_gamepad(player, GamepadState{});
 
         const hui::InputFrame input =
             tracker.update(std::span<const hui::PadSample>(samples, count), now);
-        ps4_react_set_gamepad(gamepad_state(input));
 
         // A system dialog or the on-screen keyboard owns the pad while it is
         // open. Do not also dispatch those presses to the React tree.

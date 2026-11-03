@@ -31,6 +31,8 @@ The default build produces a single installable package:
 - **Payload delivery** to GoldHEN's BinLoader with ELF and size checks.
 - **Server-Sent Events** through `Sse.connect` with bounded event queues.
 - **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
+- **Multi-controller input** with one pad per logged-in user and
+  `useGamepad(playerIndex)`; any pad navigates the UI.
 - **Device information** (model, firmware, CPU frequency/temperature, SoC
   temperature, free flexible memory) and user enumeration.
 - **Save data** through `sceSaveData` and the system on-screen keyboard through
@@ -174,7 +176,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Sound` | Play baked WAV clips with volume and pan |
 | `Notifications` / `Users` / `DeviceInfo` | Notifications, users and device information |
 | `FileSystem` | Read, write, list, rename and inspect files |
-| `Controller` / `useGamepad` | Light bar, vibration and pad state |
+| `Controller` / `useGamepad` | Light bar, vibration and per-player pad state (`playerIndex` 0..3) |
 | `Packages.install` | Install a PKG through BGFT; requires a privileged app |
 | `Packages.uninstall` | Remove a title through `sceAppInstUtil`; requires a privileged app |
 | `Payloads` | Check GoldHEN BinLoader and send an ELF payload to 127.0.0.1:9090 |

@@ -28,6 +28,13 @@ bool Pad::open() {
         system::log("pad: no initial user");
         return false;
     }
+    return open_for_user(user_);
+}
+
+bool Pad::open_for_user(int user) {
+    if (handle_ >= 0)
+        close();
+    user_ = user;
 
     const int pad_init = scePadInit();
     if (pad_init != 0)
@@ -44,7 +51,8 @@ bool Pad::open() {
         sceKernelUsleep(50000);
     }
 
-    system::log("pad: PadOpen failed=0x%08x", static_cast<unsigned>(handle_));
+    system::log("pad: PadOpen failed user=0x%08x result=0x%08x",
+                static_cast<unsigned>(user_), static_cast<unsigned>(handle_));
     handle_ = -1;
     return false;
 }

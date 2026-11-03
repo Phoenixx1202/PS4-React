@@ -122,7 +122,7 @@ inline constexpr const char* kButtonNames[] = {
   "up", "down", "left", "right", "cross", "circle", "triangle", "square",
   "l1", "r1", "l2", "r2", "l3", "r3", "options", "touchpad",
 };
-void ps4_react_set_gamepad(const GamepadState& state);
+void ps4_react_set_gamepad(int player, const GamepadState& state);
 
 // Per platform (native/ps4/host_platform.cpp).
 namespace host {

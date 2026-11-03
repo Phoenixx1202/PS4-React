@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound, Sse, WebSocket} from './native.js';
+import {acquireImage, Archives, Controller, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound, Sse, WebSocket} from './native.js';
 
 test('SaveData forwards mount, unmount and remove to the host', () => {
   assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
@@ -409,6 +409,20 @@ test('WebSocket connects, sends text and polls events', () => {
     ]);
     assert.throws(() => WebSocket.connect('http://example.com'), /ws/);
     assert.throws(() => socket.send(42), /string/);
+  } finally {
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('Controller.getState selects the player index', () => {
+  const players = [];
+  globalThis.__ps4ReactNative = {pad: {
+    state: player => { players.push(player); return {connected: true, player}; },
+  }};
+  try {
+    assert.equal(Controller.getState().player, 0);
+    assert.equal(Controller.getState(2).player, 2);
+    assert.deepEqual(players, [0, 2]);
   } finally {
     delete globalThis.__ps4ReactNative;
   }

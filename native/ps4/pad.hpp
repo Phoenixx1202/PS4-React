@@ -16,11 +16,13 @@ public:
     Pad& operator=(const Pad&) = delete;
 
     bool open();
+    bool open_for_user(int user);
     bool read(OrbisPadData& data);
     void close();
 
     bool is_open() const { return handle_ >= 0; }
     int handle() const { return handle_; }
+    int user() const { return user_; }
 
     void set_light_bar(std::uint8_t r, std::uint8_t g, std::uint8_t b);
     void reset_light_bar();

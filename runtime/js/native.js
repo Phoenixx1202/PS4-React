@@ -154,8 +154,8 @@ export const Controller = {
   resetLightBar: () => host().pad.resetLightBar(),
   /** @param {number} [strength] 0..1 @param {number} [ms] */
   vibrate: (strength = 1, ms = 200) => host().pad.vibrate(strength, ms / 1000),
-  /** @returns {GamepadState} */
-  getState: () => host().pad.state(),
+  /** @param {number} [playerIndex] 0..3 @returns {GamepadState} */
+  getState: (playerIndex = 0) => host().pad.state(playerIndex),
 };
 
 function sameState(a, b) {
@@ -167,17 +167,18 @@ function sameState(a, b) {
 /**
  * Polls the controller while mounted and re-renders only when the state changes.
  * @param {number} [intervalMs]
+ * @param {number} [playerIndex] 0..3
  * @returns {GamepadState}
  */
-export function useGamepad(intervalMs = 16) {
-  const [state, setState] = useState(Controller.getState);
+export function useGamepad(intervalMs = 16, playerIndex = 0) {
+  const [state, setState] = useState(() => Controller.getState(playerIndex));
   useEffect(() => {
     const id = setInterval(() => {
-      const next = Controller.getState();
+      const next = Controller.getState(playerIndex);
       setState(previous => (sameState(previous, next) ? previous : next));
     }, intervalMs);
     return () => clearInterval(id);
-  }, [intervalMs]);
+  }, [intervalMs, playerIndex]);
   return state;
 }
 

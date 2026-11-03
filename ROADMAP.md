@@ -146,18 +146,20 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.7 Multi-controle e multi-usuário
 
-- [ ] enumerar usuários e abrir um pad por usuário;
-- [ ] `Controller`/`useGamepad(playerIndex)` e troca de jogador;
+- [ ] enumerar usuários e abrir um pad por usuário (implementado; um pad por
+  usuário logado, até 4);
+- [ ] `Controller`/`useGamepad(playerIndex)` e troca de jogador (implementado;
+  validação pendente);
 - [ ] eventos de login/logout;
-- [ ] teste com dois controles.
+- [ ] teste com dois controles (sample controllers criado).
 
 ### 1.8 Rede avançada
 
-- [ ] WebSocket cliente (texto/binário, ping/pong, reconexão): cliente
-  texto `ws://`/`wss://` e ping/pong implementados; binário de saída e
-  reconexão automática pendentes; validação de hardware pendente;
+- [x] WebSocket texto (`ws://`/`wss://`) com handshake, framing, ping/pong,
+  close e fila limitada; validado com servidor de eco local;
 - [x] SSE/streaming HTTP para respostas longas (cliente `Sse` validado com
   servidor local; fila limitada a 256 eventos);
+- [ ] binário de saída e reconexão automática do WebSocket;
 - [ ] limites de memória e backpressure (fila limitada implementada; falta
   teste de carga);
 - [ ] servidor de teste local e testes automatizados (teste JS de `Sse` feito).
@@ -415,6 +417,11 @@ firmware/GoldHEN:
   `closed`, com os eventos `tick` exibidos. Endpoint público fechou sem
   entregar eventos, então o teste usou um servidor local no PC. Commit local
   `b185c07`.
+- 2026-11-03 - WebSocket texto validado no hardware (sample websocket, PKG
+  `7701b605b3961e5fe85321a7a50da5d6cb02166dfd2613126404bf91e1b48d49`):
+  `websocket: open ws://192.168.0.8:8766/` -> `poll state=open` -> envio
+  `hello ...` ecoado e `closed`. Commit local `91d74e9`. Binário de saída e
+  reconexão automática pendentes.
 ```
 
 ## Changelog do plano

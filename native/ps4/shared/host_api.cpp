@@ -25,7 +25,7 @@ std::atomic<const char*> host::current_call{nullptr};
 
 namespace {
 bool exit_requested = false;
-GamepadState gamepad;
+GamepadState gamepads[4];
 
 // A JS path argument and its platform path; frees the JS string on scope exit.
 class Path {
@@ -395,7 +395,11 @@ JSValue text_set_language(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
   return JS_UNDEFINED;
 }
 
-JSValue pad_state(JSContext* ctx, JSValueConst, int, JSValueConst*) {
+JSValue pad_state(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  std::int32_t player = 0;
+  if (argc > 0 && JS_ToInt32(ctx, &player, argv[0])) return JS_EXCEPTION;
+  if (player < 0 || player >= 4) player = 0;
+  const GamepadState& gamepad = gamepads[player];
   JSValue state = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, state, "connected", JS_NewBool(ctx, gamepad.connected));
   JS_SetPropertyStr(ctx, state, "leftX", JS_NewFloat64(ctx, gamepad.left_x));
@@ -473,7 +477,7 @@ constexpr Function kDevice[] = {{"info", device_info, 0}};
 constexpr Function kUsers[] = {{"foreground", users_foreground, 0}, {"loggedIn", users_logged_in, 0}};
 constexpr Function kPad[] = {
   {"setLightBar", pad_set_light_bar, 3}, {"resetLightBar", pad_reset_light_bar, 0},
-  {"vibrate", pad_vibrate, 2}, {"state", pad_state, 0},
+  {"vibrate", pad_vibrate, 2}, {"state", pad_state, 1},
 };
 constexpr Function kPower[] = {{"keepAwake", power_keep_awake, 1}};
 constexpr Function kText[] = {{"setLanguage", text_set_language, 1}};
@@ -520,8 +524,8 @@ bool ps4_react_system_dialog_active() {
   return ps4_react_dialog_active() || ps4_react_ime_active();
 }
 
-void ps4_react_set_gamepad(const GamepadState& state) {
-  gamepad = state;
+void ps4_react_set_gamepad(int player, const GamepadState& state) {
+  if (player >= 0 && player < 4) gamepads[player] = state;
 }
 
 bool ps4_react_frame(JSContext* ctx, double elapsed_ms) {
