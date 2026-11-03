@@ -21,6 +21,12 @@ fi
 # The CMake toolchain file already sets the correct compiler flags.
 unset CFLAGS CXXFLAGS CPPFLAGS
 
+# OpenOrbis' crt1.o requests the "default" libc heap (-1), which is only about
+# 12.7 MiB on hardware. A mini app inherits the shell heap; a big app gets its
+# own and the first allocation can fault inside libSceLibcInternal. Rewrite the
+# local sceLibcHeapSize in crt1.o so every package gets a real heap.
+python3 "$ROOT/tools/patch_crt1.py" "$OPENORBIS/lib/crt1.o" --heap-mib 512
+
 SAMPLE=""
 NO_PACKAGE=0
 DEV_SERVER=0
