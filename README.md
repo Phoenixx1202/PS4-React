@@ -37,7 +37,9 @@ The default build produces a single installable package:
   pitch/crop, ARGB blit at 30 fps for 480p, audio through the mixer on a
   dedicated thread). 720p/1080p and the GPU texture path are pending.
 - **GPU presentation** through Piglet/OpenGL ES (`"gpu": true`) using Sony's
-  precompiled texmap shaders, with the software VideoOut path as fallback.
+  precompiled texmap shaders, with the software VideoOut path as fallback. A
+  Vulkan/RADV spike (PS4SX2 SDK) already creates a device, registers a linear
+  image with VideoOut and flips cleared frames; runtime integration is pending.
 - **Multi-controller input** with one pad per logged-in user and
   `useGamepad(playerIndex)`; any pad navigates the UI.
 - **Device information** (model, firmware, CPU frequency/temperature, SoC

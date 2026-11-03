@@ -215,7 +215,7 @@ CPU baixa. MP3 local validado; stream HTTP, OGG/Opus e crossfade pendentes.
   handshake `sceSystemServiceLoadExec("exit", nullptr)`;
 - [x] áudio AAC: `sceAvPlayerGetAudioData` (mono S16 48 kHz) convertido para o
   mixer em um thread dedicado, com resample linear; pause/resume acompanham o
-  áudio. Qualidade contínua validada no hardware;
+  áudio. Qualidade contínua (sem picotes) ainda a confirmar no hardware;
 - [ ] 720p/1080p: o custo atual é a conversão NV12→ARGB na CPU; o decoder de
   hardware exige `libSceGnmDriver` e não pode fechar por `KillApp` (suspend
   timeout), por isso a saída usa o handshake `LoadExec("exit")`;
@@ -279,7 +279,10 @@ silenciosa. Validado no hardware; a auditoria formal fica pendente.
 
 ### 4.1 Backend GPU
 
-- [ ] spike de backend: OpenGL ES/Piglet versus GNM (PS4);
+- [x] spike Vulkan/RADV com o SDK do PS4SX2: instância/device (`AMD Liverpool
+  (PS4) (RADV BONAIRE)`), imagem linear 1920x1080 host-visible, registro
+  direto no `sceVideoOutRegisterBuffers` e flip com clear vermelho/verde/azul
+  validados no hardware (probe local, ainda fora do runtime React);
 - [x] abstração `Renderer` com implementação software e apresentação GPU
   (Piglet/EGL) opt-in por `"gpu": true`, com fallback software; validada no
   hardware com shaders pré-compilados da Sony (`texmap`);
@@ -482,6 +485,14 @@ firmware/GoldHEN:
   dedicado; pause/resume/seek/fechamento validados com áudio, PKG
   `b1b1fde6b9368fa4244d0610b50114022ead39796fa63770d8759e3b62ada9a9`.
   720p/1080p e textura GPU/YUV pendentes. Sem push.
+- 2026-11-03 - spike Vulkan/RADV validado no hardware usando o SDK/Mesa do
+  PS4SX2: `vkCreateInstance` e `vkCreateDevice` OK, GPU detectada como
+  `AMD Liverpool (PS4) (RADV BONAIRE)`, imagem linear 1920x1080 (pitch 7680),
+  memória GPU host-visible, `sceVideoOutRegisterBuffers` e três flips com clear
+  vermelho/verde/azul. O probe é local (`.build/vkprobe`, não versionado).
+  A integração com o runtime React ainda precisa do toolchain PS4SX2
+  (libc++21/Mesa) ou de um PRX Vulkan; 720p/1080p, 4K/HDR e UI na GPU continuam
+  pendentes. Sem push.
 ```
 
 ## Changelog do plano
