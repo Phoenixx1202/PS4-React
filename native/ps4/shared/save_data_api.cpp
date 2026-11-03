@@ -258,3 +258,15 @@ JSValue ps4_react_save_data_api(JSContext* ctx) {
     JS_SetPropertyStr(ctx, api, "remove", JS_NewCFunction(ctx, remove, "remove", 1));
     return api;
 }
+
+// Releases every mount before the title is closed. A mounted save data
+// directory holds a SceSaveData app-suspend block; the system's KillApp
+// suspends the title first, and that block makes the suspend time out.
+extern "C" void ps4_react_save_data_shutdown() {
+    std::lock_guard<std::mutex> lock(mount_mutex);
+    for (auto& [name, entry] : mounted) {
+        (void)sceSaveDataUmount(&entry.point);
+        (void)name;
+    }
+    mounted.clear();
+}

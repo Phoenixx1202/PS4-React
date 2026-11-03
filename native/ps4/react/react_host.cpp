@@ -27,6 +27,10 @@ extern "C" {
 #include "er_scene.h"
 #include "native_renderer.h"
 #include "software_backend.h"
+
+// Defined in save_data_api.cpp: releases every save-data mount, and with it
+// the SceSaveData app-suspend block.
+void ps4_react_save_data_shutdown();
 }
 
 #if defined(PS4_REACT_DEV_SERVER)
@@ -319,6 +323,12 @@ int main() {
     }
 
     ps4::system::log("PS4 React Starter: loop ended after %u frames", total_frames);
+
+    // A mounted save-data directory holds a SceSaveData suspend block. KillApp
+    // suspends the title before killing it; release the mount first or the
+    // suspend times out and the shell remains on the splash.
+    ps4::system::log("PS4 React Starter: releasing save data before close");
+    ps4_react_save_data_shutdown();
 
     // Try the close while the display and focus are still ours. The system
     // refuses the request after VideoOut and the rest of the state are gone.
