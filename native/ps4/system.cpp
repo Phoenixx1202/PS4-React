@@ -149,6 +149,23 @@ void park() {
 void exit_app() {
     log("system: requesting title closure");
     std::fflush(nullptr);
+
+    // LoadExec("exit") is rejected on some firmware, including the setup used
+    // here (0x80a10005). The system's own close path takes the running app id.
+    int app = sceSystemServiceGetAppIdOfBigApp();
+    if (app <= 0)
+        app = sceSystemServiceGetAppIdOfMiniApp();
+    if (app > 0) {
+        const int killed = sceSystemServiceKillApp(
+            static_cast<std::uint32_t>(app), -1, 0, 0);
+        log("system: KillApp(0x%08x)=0x%08x", static_cast<unsigned>(app),
+            static_cast<unsigned>(killed));
+        if (killed == 0)
+            park();
+    } else {
+        log("system: no running app id");
+    }
+
     const int result = sceSystemServiceLoadExec("exit", nullptr);
     log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
     park();
