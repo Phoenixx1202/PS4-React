@@ -23,6 +23,7 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample websocket
 .\tools\build_ps4.ps1 -Sample controllers
 .\tools\build_ps4.ps1 -Sample music
+.\tools\build_ps4.ps1 -Sample video
 .\tools\build_ps4.ps1 -Sample gpu
 ```
 
@@ -68,6 +69,7 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `websocket` | ws/wss text messages, echo server and polling |
 | `controllers` | Four player panels with `useGamepad(playerIndex)` |
 | `music` | Local MP3 playback with the mixer music deck |
+| `video` | Local MP4/H.264 playback through `sceAvPlayer` with pause/resume/seek/stop; put the file at `/data/pkg/sample.mp4` |
 | `gpu` | Piglet/OpenGL ES presentation with software fallback |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the

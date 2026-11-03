@@ -28,6 +28,9 @@ void hide_splash();
 // Tries the system close request. Uses the caller's app id from the kernel app
 // info; GetAppIdOfBigApp fails inside a game on this firmware.
 bool request_close();
+// Official shell exit handshake; used instead of KillApp when a decoder holds
+// GPU resources that make KillApp's suspend time out.
+bool request_exit_handshake();
 
 // Queues the current title for launch through sceLncUtilLaunchApp. Call before
 // request_close(); the shell starts the new instance after this process exits.

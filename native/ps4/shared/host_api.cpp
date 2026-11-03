@@ -512,6 +512,7 @@ void ps4_react_install_host_api(JSContext* ctx) {
   JS_SetPropertyStr(ctx, api, "image", ps4_react_image_api(ctx));
   JS_SetPropertyStr(ctx, api, "sound", ps4_react_sound_api(ctx));
   JS_SetPropertyStr(ctx, api, "music", ps4_react_music_api(ctx));
+  JS_SetPropertyStr(ctx, api, "video", ps4_react_video_api(ctx));
   JSValue global = JS_GetGlobalObject(ctx);
   JS_SetPropertyStr(ctx, global, "__ps4ReactNative", api);
   JS_FreeValue(ctx, global);

@@ -341,6 +341,7 @@ int main() {
             fatal("commit error");
         }
 
+        ps4_react_video_pump();
         if (!present(er_software_framebuffer())) {
             ps4::system::log("PS4 React Starter: present failed");
             break;
@@ -367,6 +368,10 @@ int main() {
 
     ps4::system::log("PS4 React Starter: loop ended after %u frames", total_frames);
 
+    // Stop the AvPlayer threads and unload its modules before KillApp's suspend.
+    ps4_react_video_shutdown();
+    ps4::system::sleep_us(150000);
+
     // A mounted save-data directory holds a SceSaveData suspend block. KillApp
     // suspends the title before killing it; release the mount first or the
     // suspend times out and the shell remains on the splash.
@@ -375,7 +380,8 @@ int main() {
 
     // Try the close while the display and focus are still ours. The system
     // refuses the request after VideoOut and the rest of the state are gone.
-    if (ps4::system::request_close()) {
+    const bool handshake = ps4_react_video_used() && ps4::system::request_exit_handshake();
+    if (handshake || ps4::system::request_close()) {
         ps4::system::log("system: close accepted; waiting for the system");
         ps4::system::park();
     }

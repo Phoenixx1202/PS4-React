@@ -221,6 +221,30 @@ export const Music = Object.freeze({
   setVolume: volume => host().music.setVolume(volume),
 });
 
+/**
+ * Video playback through sceAvPlayer. `play` opens a local MP4 and starts decoding; the host
+ * polls decoded NV12 frames once per render frame and draws them into the requested rectangle.
+ * Pause/resume/seek/stop control the player.
+ */
+export const Video = Object.freeze({
+  /** @param {{path: string, x?: number, y?: number, width?: number, height?: number}} options */
+  play({path, x = 0, y = 0, width = 1920, height = 1080} = {}) {
+    if (typeof path !== 'string' || !path) throw new TypeError('Video.play: expected a path');
+    if (!host().video.play(path, x, y, width, height)) {
+      const status = host().video.status();
+      throw new Error(`Video.play: ${status.error || `failed to open ${path}`}`);
+    }
+    return Object.freeze({
+      pause: () => host().video.pause(),
+      resume: () => host().video.resume(),
+      seek: seconds => host().video.seek(seconds),
+      stop: () => host().video.stop(),
+      setRect: (left, top, w, h) => host().video.setRect(left, top, w, h),
+      status: () => host().video.status(),
+    });
+  },
+});
+
 export const Linking = {
   /** Opens an http(s) URL in the system browser. @param {string} url @returns {boolean} */
   openURL(url) {

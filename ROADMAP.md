@@ -206,13 +206,22 @@ CPU baixa. MP3 local validado; stream HTTP, OGG/Opus e crossfade pendentes.
 
 ### 2.2 Vídeo
 
-- [ ] spike `sceAvPlayer` (formatos, áudio, legendas, faixas);
-- [ ] `<Video>` e API `AvPlayer` para arquivo local e URL;
-- [ ] sincronização áudio/vídeo e controle (play/pause/seek/stop);
-- [ ] caminho de textura (GPU) e fallback software em resolução limitada;
-- [ ] sample `video`.
+- [x] spike `sceAvPlayer` local MP4 (H.264): init/PostInit/AddSource/Ready/
+  EnableStream/Start, frames NV12 via `GetVideoDataEx` com pitch e crop;
+  validado no hardware em 480p (30 fps) com decoder de software;
+- [x] API `Video` (play/pause/resume/seek/stop/setRect/status) e sample
+  `video` com overlay no framebuffer do engine; falta o componente `<Video>`;
+- [x] controle play/pause/resume/seek (ms)/stop e fechamento limpo pelo
+  handshake `sceSystemServiceLoadExec("exit", nullptr)`; áudio ainda pendente;
+- [ ] 720p/1080p: o custo atual é a conversão NV12→ARGB na CPU; o decoder de
+  hardware exige `libSceGnmDriver` e não pode fechar por `KillApp` (suspend
+  timeout), por isso a saída usa o handshake `LoadExec("exit")`;
+- [ ] caminho de textura GPU/YUV (evita a conversão CPU e o custo de ler
+  WC_GARLIC);
+- [x] sample `video`.
 
-**Aceite:** MP4 H.264 1080p com áudio sincronizado, seek e sem leak.
+**Aceite:** MP4 H.264 1080p com áudio sincronizado, seek e sem leak. 480p
+software validado; 720p/1080p, áudio e GPU pendentes.
 
 ### 2.3 Imagens
 
@@ -455,6 +464,18 @@ firmware/GoldHEN:
   call. O probe em hardware confirmou o bloqueio; o caminho software +
   apresentação GPU (PKG `35b687e14d5aa2f9e375a57b86a9d91a9e5263ba9c57676391e1923ae4a85f5f`)
   foi restaurado e validado. Sem push.
+- 2026-11-03 - vídeo `sceAvPlayer` validado no hardware (sample video,
+  PS4 5.05/GoldHEN): `init`, `PostInit`, `AddSource`, evento Ready, stream de
+  vídeo habilitada e `Start`; frames 864x480, `pitch=896`, `crop_right=42`,
+  NV12 8-bit; conversão para ARGB e blit no framebuffer do engine a 30 fps.
+  O decoder precisa de `libSceGnmDriver` pré-carregado (senão GoldHEN mata a
+  thread com `PRX_NOT_RESOLVED_FUNCTION`). O `KillApp` suspende o título e
+  espera um submit-done de GPU que não chega, estourando
+  `CPU_FAULT_SUBMITDONE_TIMEOUT_IN_SUSPEND_ASYNC`; a saída limpa usa o handshake
+  oficial `sceSystemServiceLoadExec("exit", nullptr)`. Seek em milissegundos,
+  pause/resume/stop e fechamento validados no hardware; PKG
+  `f4cb215b77cc84c3b42b61548c8427149446b76c8f4924d3e069fccc2804d839`.
+  Áudio AAC, 720p/1080p e textura GPU pendentes. Sem push.
 ```
 
 ## Changelog do plano

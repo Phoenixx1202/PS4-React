@@ -237,6 +237,14 @@ bool relaunch(int& result) {
     return exec_result == 0;
 }
 
+bool request_exit_handshake() {
+    log("system: LoadExec(exit) handshake");
+    std::fflush(nullptr);
+    const int result = sceSystemServiceLoadExec("exit", nullptr);
+    log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
+    return result == 0;
+}
+
 bool request_close() {
     log("system: requesting title closure");
     std::fflush(nullptr);

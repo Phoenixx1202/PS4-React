@@ -33,6 +33,9 @@ The default build produces a single installable package:
 - **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
 - **Music** playback: MP3 decoding, 48 kHz resampling and the mixer's music
   deck (local files; HTTP streaming is pending).
+- **Video** playback through `sceAvPlayer` (local MP4/H.264, NV12 with
+  pitch/crop, ARGB blit at 30 fps for 480p). Audio, 720p/1080p and the GPU
+  texture path are pending.
 - **GPU presentation** through Piglet/OpenGL ES (`"gpu": true`) using Sony's
   precompiled texmap shaders, with the software VideoOut path as fallback.
 - **Multi-controller input** with one pad per logged-in user and
@@ -187,6 +190,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Sse` | Server-Sent Events stream with event polling and cancellation |
 | `WebSocket` | ws/wss text client with polling, ping/pong and close |
 | `Music` | Local MP3 playback with pause/resume/stop and volume |
+| `Video` | Local MP4/H.264 playback through `sceAvPlayer`; pause/resume/seek/stop |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Dialog` | System message dialogs (`alert`, `confirm` and `progress`) |
@@ -194,7 +198,8 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
 `BrowserCapture` is not part of the PS4 runtime. Music streaming is not
-implemented yet.
+implemented yet. Video currently targets 480p with CPU NV12 conversion; audio,
+720p/1080p and the GPU texture path are pending.
 
 Save data and the system keyboard are available from the same import:
 
@@ -261,6 +266,10 @@ Known limitations:
 
 - RAR/RAR5 extraction is not available yet; ZIP/TAR/7z are supported.
 - Music streaming is not implemented yet.
+- Video playback uses the software decoder and CPU NV12 conversion (480p30 on
+  hardware); AAC audio, 720p/1080p and GPU YUV are pending. Video apps close
+  through `sceSystemServiceLoadExec("exit", nullptr)` because `KillApp`'s
+  suspend waits for a decoder GPU submit that never completes.
 - `Packages` requires an app packaged with `"privileged": true`; it loads the
   internal AppInstUtil/BGFT sysmodules and installs through BGFT. Validated on
   the target PS4 5.05/GoldHEN console; large and invalid PKGs are untested.

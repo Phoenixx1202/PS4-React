@@ -210,6 +210,12 @@ bool ps4_react_start_sound();
 void ps4_react_stop_sound();
 void ps4_react_music_attach(hui::audio::Mixer& mixer);
 JSValue ps4_react_music_api(JSContext* ctx);
+// ABI v9: sceAvPlayer video playback. The host pumps decoded frames once per render frame.
+JSValue ps4_react_video_api(JSContext* ctx);
+void ps4_react_video_pump();
+void ps4_react_video_stop();
+void ps4_react_video_shutdown();
+bool ps4_react_video_used();
 
 // ABI v5 additive archive tasks: extract(sources, destination, maxBytes, password?), inspect(sources), cancel(id), poll().
 JSValue ps4_react_archive_api(JSContext* ctx);
