@@ -44,7 +44,7 @@ function App() {
   const create = () => {
     setError('');
     watch('Create', Archives.create({
-      sources: ['/app0/app.json', '/app0/sce_sys/param.sfo'],
+      sources: ['/app0/ca-bundle.crt'],
       destination: ZIP,
       format: 'zip',
       overwrite: true,
@@ -75,8 +75,8 @@ function App() {
   const verify = () => {
     setError('');
     try {
-      const file = `${OUT}/app.json`;
-      setStatus(FileSystem.exists(file) ? 'Extracted app.json found.' : 'app.json is missing.');
+      const file = `${OUT}/ca-bundle.crt`;
+      setStatus(FileSystem.exists(file) ? 'Extracted ca-bundle.crt found.' : 'ca-bundle.crt is missing.');
       setDetail(file);
     } catch (reason) {
       setStatus('Verify failed.');
