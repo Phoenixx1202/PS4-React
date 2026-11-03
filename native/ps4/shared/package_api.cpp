@@ -440,10 +440,17 @@ JSValue uninstall(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
         return JS_ThrowTypeError(ctx,
             "Packages.uninstall requires a privileged app; set \"privileged\": true in app.json");
     }
-    if (argc < 1 || !JS_IsObject(argv[0]))
-        return JS_ThrowTypeError(ctx, "Packages.uninstall: expected {titleId}");
-    JSValue value = JS_GetPropertyStr(ctx, argv[0], "titleId");
-    if (JS_IsException(value)) return value;
+    if (argc < 1)
+        return JS_ThrowTypeError(ctx, "Packages.uninstall: expected a title id");
+    JSValue value;
+    if (JS_IsString(argv[0])) {
+        value = JS_DupValue(ctx, argv[0]);
+    } else if (JS_IsObject(argv[0])) {
+        value = JS_GetPropertyStr(ctx, argv[0], "titleId");
+        if (JS_IsException(value)) return value;
+    } else {
+        return JS_ThrowTypeError(ctx, "Packages.uninstall: expected a title id");
+    }
     std::size_t length = 0;
     const char* input = JS_ToCStringLen(ctx, &length, value);
     JS_FreeValue(ctx, value);
