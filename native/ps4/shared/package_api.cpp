@@ -7,6 +7,7 @@
 #include "system.hpp"
 
 #include <orbis/Bgft.h>
+#include <orbis/Sysmodule.h>
 #include <orbis/libkernel.h>
 
 #include <algorithm>
@@ -152,12 +153,33 @@ bool read_content_id(const std::string& path, std::string& out) {
     return true;
 }
 
-std::int32_t load_module(const char* path) {
-    const std::uint32_t raw =
-        sceKernelLoadStartModule(path, 0, nullptr, 0, nullptr, nullptr);
-    const std::int32_t handle = static_cast<std::int32_t>(raw);
-    ps4::system::log("packages: %s module=0x%08x", path, static_cast<unsigned>(raw));
-    return handle;
+std::int32_t find_module(const char* needle) {
+    OrbisKernelModule modules[256] = {};
+    std::size_t count = 0;
+    const int result = sceKernelGetModuleList(modules, 256, &count);
+    if (result != 0) {
+        ps4::system::log("packages: GetModuleList=0x%08x", static_cast<unsigned>(result));
+        return -1;
+    }
+    for (std::size_t i = 0; i < count && i < 256; ++i) {
+        OrbisKernelModuleInfo info{};
+        info.size = sizeof info;
+        if (sceKernelGetModuleInfo(modules[i], &info) != 0) continue;
+        if (std::strstr(info.name, needle))
+            return static_cast<std::int32_t>(modules[i]);
+    }
+    ps4::system::log("packages: %s not in the module list (%u modules)", needle,
+                     static_cast<unsigned>(count));
+    return -1;
+}
+
+std::int32_t load_sysmodule(OrbisSysModuleInternal id, const char* needle) {
+    const std::uint32_t raw = sceSysmoduleLoadModuleInternal(id);
+    ps4::system::log("packages: sysmodule 0x%08x module=0x%08x",
+                     static_cast<unsigned>(id), static_cast<unsigned>(raw));
+    const std::int32_t result = static_cast<std::int32_t>(raw);
+    if (result < 0) return result;
+    return find_module(needle);
 }
 
 template <typename Function>
@@ -174,7 +196,8 @@ bool resolve_symbol(std::int32_t module, const char* name, Function& function) {
 
 int initialize_services() {
     std::call_once(api_init, [] {
-        appinst.module = load_module("/system/common/lib/libSceAppInstUtil.sprx");
+        appinst.module = load_sysmodule(ORBIS_SYSMODULE_INTERNAL_APP_INST_UTIL,
+                                        "libSceAppInstUtil");
         if (appinst.module < 0) {
             api_init_error = appinst.module;
             return;
@@ -187,7 +210,7 @@ int initialize_services() {
             return;
         }
 
-        bgft.module = load_module("/system/common/lib/libSceBgft.sprx");
+        bgft.module = load_sysmodule(ORBIS_SYSMODULE_INTERNAL_BGFT, "libSceBgft");
         if (bgft.module < 0) {
             api_init_error = bgft.module;
             return;
