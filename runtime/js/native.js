@@ -533,6 +533,25 @@ export const Packages = Object.freeze({
   },
 });
 
+/**
+ * Sends an ELF payload to GoldHEN's BinLoader on 127.0.0.1:9090. The runtime
+ * never executes the file; GoldHEN does, so keep the source and the user's
+ * confirmation explicit. `send` accepts paths under /app0, /data, /download0
+ * and /temp0, requires an ELF header and caps the file at 64 MiB.
+ */
+export const Payloads = Object.freeze({
+  /** @returns {boolean} whether BinLoader accepts a connection */
+  isAvailable: () => host().payloads.isAvailable(),
+  /** @param {{path: string}} options @returns {ReturnType<typeof networkTask>} */
+  send({path}) {
+    if (typeof path !== 'string' || !path) throw new TypeError('Payloads.send: expected a payload path');
+    const backend = host().payloads;
+    if (typeof backend?.send !== 'function') throw new Error('Payloads.send is not available on this host');
+    const id = backend.send(path);
+    return networkTask(id, 'Payloads.send', path, 'payloads');
+  },
+});
+
 const pendingImages = new Map();
 let stopImagePolling = null;
 

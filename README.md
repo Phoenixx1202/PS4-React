@@ -27,6 +27,7 @@ The default build produces a single installable package:
 - **PKG installation and removal** through the BGFT install service via
   `Packages.install`/`Packages.uninstall`, with progress and errors. Apps that
   use it are packaged with `"privileged": true` (`IV0000`/`gde`).
+- **Payload delivery** to GoldHEN's BinLoader with ELF and size checks.
 - **Save data** through `sceSaveData` and the system on-screen keyboard through
   `sceImeDialog`.
 - **PKG packaging** validated with `PkgTool.Core` and a load-image checker.
@@ -170,14 +171,15 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Controller` / `useGamepad` | Light bar, vibration and pad state |
 | `Packages.install` | Install a PKG through BGFT; requires a privileged app |
 | `Packages.uninstall` | Remove a title through `sceAppInstUtil`; requires a privileged app |
+| `Payloads` | Check GoldHEN BinLoader and send an ELF payload to 127.0.0.1:9090 |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Dialog` | System message dialogs (`alert` and `confirm`) |
 | `AppState` | App lifecycle state and system events (resume, URL open, focus) |
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
-`Payloads` and `BrowserCapture` are not part of the PS4 runtime. Music
-streaming is not implemented yet.
+`BrowserCapture` is not part of the PS4 runtime. Music streaming is not
+implemented yet.
 
 Save data and the system keyboard are available from the same import:
 

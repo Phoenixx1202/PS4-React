@@ -58,6 +58,7 @@ add_executable(ps4_react_starter
     react_host.cpp
     ../host_platform.cpp
     ../shared/package_api.cpp
+    ../shared/payload_api.cpp
     ../shared/save_data_api.cpp
     ../shared/ime_api.cpp
     ../shared/dialog_api.cpp

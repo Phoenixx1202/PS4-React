@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Downloads, FileSystem, Http, Keyboard, Packages, Power, SaveData, Sound} from './native.js';
+import {acquireImage, Archives, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound} from './native.js';
 
 test('SaveData forwards mount, unmount and remove to the host', () => {
   assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
@@ -265,6 +265,37 @@ test('Packages installs and uninstalls through the host', async () => {
     tick();
     assert.equal((await remove.done).state, 'completed');
     assert.throws(() => Packages.uninstall({titleId: 'cusa99060'}), /nine-character/);
+  } finally {
+    globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('Payloads checks BinLoader and sends through a network task', async () => {
+  let tick, snapshots = [];
+  const sends = [];
+  const originalInterval = globalThis.setInterval;
+  const originalClear = globalThis.clearInterval;
+  globalThis.setInterval = callback => { tick = callback; return 1; };
+  globalThis.clearInterval = () => {};
+  globalThis.__ps4ReactNative = {payloads: {
+    isAvailable: () => true,
+    send: path => { sends.push(path); return 7; },
+    cancel: () => {},
+    poll: () => snapshots,
+  }};
+  try {
+    assert.equal(Payloads.isAvailable(), true);
+    const task = Payloads.send({path: '/data/pkg/payload.elf'});
+    assert.equal(task.id, 7);
+    assert.deepEqual(sends, ['/data/pkg/payload.elf']);
+    snapshots = [{id: 7, state: 'sending', written: 64, total: 128, error: ''}];
+    tick();
+    assert.deepEqual([task.snapshot.state, task.snapshot.written, task.snapshot.total], ['sending', 64, 128]);
+    snapshots = [{id: 7, state: 'completed', written: 128, total: 128}];
+    tick();
+    assert.equal((await task.done).state, 'completed');
+    assert.throws(() => Payloads.send({}), /expected a payload path/);
   } finally {
     globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
     delete globalThis.__ps4ReactNative;
