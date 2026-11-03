@@ -23,6 +23,7 @@ if(NOT EXISTS "${PS4_REACT_GENERATED_DIR}/sounds.generated.c")
 endif()
 
 option(PS4_REACT_DEV_SERVER "Enable the TCP hot-reload receiver" OFF)
+option(PS4_REACT_PRIVILEGED "Package with the system auth id used by installer apps" OFF)
 
 set(ER_BRIDGE_QUICKJS_SMOKE OFF CACHE BOOL "" FORCE)
 set(ER_BRIDGE_QUICKJS_RUNTEST OFF CACHE BOOL "" FORCE)
@@ -137,6 +138,7 @@ target_link_libraries(ps4_react_starter PRIVATE
     embedded-react
     SceSysmodule
     SceAppInstUtil
+    SceBgft
     SceSaveData
     SceCommonDialog
     SceMsgDialog
@@ -173,7 +175,29 @@ target_link_options(ps4_react_starter PRIVATE
     --wrap=posix_memalign)
 
 if(COMMAND add_self)
-    add_self(ps4_react_starter)
+    # The stock add_self always uses the homebrew auth id. Installer-class apps
+    # (Packages.install/uninstall) need the system auth id used by NextGen:
+    # category gde, ATTRIBUTE 32 and paid 0x3800000000000011.
+    if(PS4_REACT_PRIVILEGED)
+        set(PS4_REACT_PAID "0x3800000000000011")
+    else()
+        set(PS4_REACT_PAID "0x3800000000000035")
+    endif()
+    set(PS4_REACT_AUTH_INFO "000000000000000000000000001C004000FF000000000080000000000000000000000000000000000000008000400040000000000000008000000000000000080040FFFF000000F000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ps4_react_starter.oelf"
+               "${CMAKE_CURRENT_BINARY_DIR}/eboot.bin"
+        COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OPENORBIS}"
+                "${OPENORBIS}/bin/create-fself"
+                "-in=${CMAKE_CURRENT_BINARY_DIR}/ps4_react_starter"
+                "-out=${CMAKE_CURRENT_BINARY_DIR}/ps4_react_starter.oelf"
+                "--eboot" "eboot.bin"
+                "--paid" "${PS4_REACT_PAID}"
+                "--authinfo" "${PS4_REACT_AUTH_INFO}"
+        VERBATIM
+        DEPENDS ps4_react_starter)
+    add_custom_target(ps4_react_starter_self ALL
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ps4_react_starter.oelf")
 
     set(PS4_REACT_APP_DIR "${CMAKE_BINARY_DIR}/app-react")
     add_custom_target(ps4_react_starter_stage ALL

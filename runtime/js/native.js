@@ -497,20 +497,26 @@ export const Archives = Object.freeze({
 });
 
 /**
- * PKG installation and removal through the console's install service
- * (`sceAppInstUtil`). The task's snapshot carries the install `percent`, the
- * console's `installState`/`status`, the package's `titleId`/`contentId` and,
- * when the service reports it, `written`/`total` sizes. It completes when the
- * service returns. Cancelling stops reporting only; an install the console
- * accepted carries on.
+ * PKG installation and removal through the console's install services. Only
+ * apps packaged with `"privileged": true` can use it: installation runs through
+ * the BGFT download manager (`sceBgftServiceIntDownloadRegisterTaskByStorageEx`)
+ * and removal through `sceAppInstUtilAppUnInstall`.
+ *
+ * The task's snapshot carries the install `percent`, the package's
+ * `titleId`/`contentId` and the BGFT task id. It completes when the title shows
+ * up in the install service. Passing `overwrite: true` removes an existing
+ * installation first. Cancelling stops and unregisters the BGFT task.
  */
 export const Packages = Object.freeze({
-  install({path, name = ''}) {
+  install({path, name = '', overwrite = false}) {
     const backend = host().packages;
     if (typeof backend?.install !== 'function') {
       throw new Error('Packages.install is not available on this host');
     }
-    const id = backend.install(path, name);
+    if (typeof overwrite !== 'boolean') {
+      throw new TypeError('Packages.install: overwrite must be a boolean');
+    }
+    const id = backend.install(path, name, overwrite);
     return networkTask(id, 'Packages.install', path, 'packages');
   },
   /** Uninstalls an installed title by its nine-character title id. */

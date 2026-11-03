@@ -1,9 +1,10 @@
 {
   "$schema": "../../app.schema.json",
   "titleId": "CUSA99066",
-  "contentId": "UP0001-CUSA99066_00-PS4SAMPLEPKG0001",
+  "contentId": "IV0000-CUSA99066_00-PS4SAMPLEPKG0001",
   "name": "PS4 React Sample: Packages",
   "version": "01.000.000",
+  "privileged": true,
   "render": {
     "width": 2560,
     "height": 1440

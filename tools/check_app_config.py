@@ -60,6 +60,8 @@ def validate(path: Path) -> list[str]:
         errors.append("networking must be a boolean")
     if "filesystemAccess" in app and app["filesystemAccess"] not in ("sandbox", "console"):
         errors.append('filesystemAccess must be "sandbox" or "console"')
+    if "privileged" in app and not isinstance(app["privileged"], bool):
+        errors.append("privileged must be a boolean")
     if "timeoutSeconds" in app:
         number = app["timeoutSeconds"]
         if not isinstance(number, (int, float)) or isinstance(number, bool) or number < 1:

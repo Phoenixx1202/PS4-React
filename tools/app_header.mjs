@@ -19,4 +19,5 @@ writeFileSync(outputPath, `#pragma once
 #define PS4_REACT_CONTENT_ID ${c(app.contentId)}
 #define PS4_REACT_APP_NAME ${c(app.name)}
 #define PS4_REACT_APP_VERSION ${c(version)}
+#define PS4_REACT_PRIVILEGED ${app.privileged ? 1 : 0}
 `);

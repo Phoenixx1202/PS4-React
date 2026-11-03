@@ -69,7 +69,7 @@ function App() {
     });
   };
 
-  const install = () => run('Install', () => Packages.install({path: PKG}));
+  const install = () => run('Install', () => Packages.install({path: PKG, overwrite: true}));
   const uninstall = () => run('Uninstall', () => Packages.uninstall({titleId: TITLE_ID}));
 
   return (

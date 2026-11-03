@@ -45,6 +45,8 @@ def main() -> int:
     parser.add_argument("--keep-stage", action="store_true")
     parser.add_argument("--skip-load-image-check", action="store_true",
                         help="skip the initialized-section check (not recommended)")
+    parser.add_argument("--privileged", action="store_true",
+                        help="system-auth installer package (CATEGORY gde, ATTRIBUTE 32)")
     args = parser.parse_args()
 
     sdk = Path(os.environ.get("OPENORBIS", "/opt/pacbrew/ps4/openorbis"))
@@ -131,7 +133,7 @@ def main() -> int:
 
     strings = {
         "APP_VER": (version, 8),
-        "CATEGORY": ("gd", 4),
+        "CATEGORY": ("gde" if args.privileged else "gd", 4),
         "FORMAT": ("obs", 4),
         "CONTENT_ID": (content_id, 48),
         "TITLE": (args.title, 128),
@@ -143,10 +145,11 @@ def main() -> int:
             "--maxsize", size, "--value", value, env=env)
     # ATTRIBUTE bit 1 (0x02) fixes Cross as the common-dialog enter button.
     # Without it the IME follows the console's region assignment, so a
-    # Circle-confirm console shows Cross as cancel in the keyboard.
+    # Circle-confirm console shows Cross as cancel in the keyboard. Installer
+    # apps instead use 32 (0x20): the NextGen installer's system-auth recipe.
     for key, value in {
         "APP_TYPE": 1,
-        "ATTRIBUTE": 2,
+        "ATTRIBUTE": 32 if args.privileged else 2,
         "DOWNLOAD_DATA_SIZE": 0,
         "SYSTEM_VER": 0,
     }.items():

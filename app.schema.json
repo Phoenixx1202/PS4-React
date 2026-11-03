@@ -53,6 +53,11 @@
       "description": "sandbox exposes app paths; console also allows mounted filesystems.",
       "enum": ["sandbox", "console"],
       "default": "sandbox"
+    },
+    "privileged": {
+      "type": "boolean",
+      "description": "Package with the system auth id used by installer apps. Required by Packages.install/uninstall; the PKG is built as category gde with ATTRIBUTE 32.",
+      "default": false
     }
   },
   "additionalProperties": true,

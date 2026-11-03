@@ -245,9 +245,9 @@ test('Packages installs and uninstalls through the host', async () => {
     poll: () => snapshots,
   }};
   try {
-    const install = Packages.install({path: '/data/pkg/counter.pkg'});
+    const install = Packages.install({path: '/data/pkg/counter.pkg', overwrite: true});
     assert.equal(install.id, 1);
-    assert.deepEqual(calls, [['install', '/data/pkg/counter.pkg', '']]);
+    assert.deepEqual(calls, [['install', '/data/pkg/counter.pkg', '', true]]);
     snapshots = [{id: 1, state: 'installing', percent: 42, titleId: 'CUSA99060',
       contentId: 'UP0001-CUSA99060_00-PS4SAMPCOUNTER01', error: ''}];
     tick();

@@ -155,10 +155,11 @@ python3 "$ROOT/tools/check_app_config.py" "$APP/app.json"
 APP_META=$(python3 - "$APP/app.json" <<'PY'
 import json, sys
 app = json.load(open(sys.argv[1], encoding='utf-8'))
-print('\x1f'.join((app['titleId'], app['contentId'], app['name'], app['version'])))
+print('\x1f'.join((app['titleId'], app['contentId'], app['name'], app['version'],
+                  '1' if app.get('privileged', False) else '0')))
 PY
 )
-IFS=$'\x1f' read -r TITLE_ID CONTENT_ID TITLE VERSION <<< "$APP_META"
+IFS=$'\x1f' read -r TITLE_ID CONTENT_ID TITLE VERSION PRIVILEGED <<< "$APP_META"
 
 rm -rf "$GEN"
 mkdir -p "$GEN/app"
@@ -199,16 +200,22 @@ cmake -S "$ROOT" -B "$BUILD" \
     -DHARFBUZZ_SRC="$HB_SRC/src" -DHARFBUZZ_LIB_DIR="$HB_BUILD" \
     -DPS4_REACT_GENERATED_DIR="$GEN" \
     -DPS4_REACT_CRT1="$CRT1" \
+    -DPS4_REACT_PRIVILEGED="$([ "$PRIVILEGED" = "1" ] && echo ON || echo OFF)" \
     -DPS4_REACT_DEV_SERVER="$([ "$DEV_SERVER" = "1" ] && echo ON || echo OFF)"
 cmake --build "$BUILD" --target ps4_react_starter_stage --parallel "$(nproc)"
 
 if [ "$NO_PACKAGE" = "0" ]; then
+    PRIVILEGED_ARG=""
+    if [ "$PRIVILEGED" = "1" ]; then
+        PRIVILEGED_ARG="--privileged"
+    fi
     python3 "$ROOT/tools/package_ps4.py" "$BUILD/native/ps4/react" \
         --app-dir "$BUILD/app-react" \
         --title-id "$TITLE_ID" \
         --content-id "$CONTENT_ID" \
         --title "$TITLE" \
         --version "$VERSION" \
+        $PRIVILEGED_ARG \
         --assets "$ROOT/assets" \
         --output "$BUILD/$OUTPUT_NAME"
 fi
