@@ -198,6 +198,29 @@ export const Sound = {
   setVolume: volume => host().sound.setVolume(volume),
 };
 
+/**
+ * MP3 music on the mixer's music deck. `play` decodes a local file on a worker
+ * thread, resamples it to 48 kHz and fills the stream ring; pause/resume/stop
+ * control the deck. The app needs at least one baked sound to open the audio
+ * output.
+ */
+export const Music = Object.freeze({
+  /** @param {{path: string, volume?: number}} options */
+  play({path, volume = 1} = {}) {
+    if (typeof path !== 'string' || !path) throw new TypeError('Music.play: expected a path');
+    const id = host().music.play(path, volume);
+    return Object.freeze({
+      id,
+      pause: () => host().music.pause(id),
+      resume: () => host().music.resume(id),
+      stop: () => host().music.stop(id),
+      status: () => host().music.status(id),
+    });
+  },
+  /** @param {number} volume 0..1 */
+  setVolume: volume => host().music.setVolume(volume),
+});
+
 export const Linking = {
   /** Opens an http(s) URL in the system browser. @param {string} url @returns {boolean} */
   openURL(url) {

@@ -31,6 +31,8 @@ The default build produces a single installable package:
 - **Payload delivery** to GoldHEN's BinLoader with ELF and size checks.
 - **Server-Sent Events** through `Sse.connect` with bounded event queues.
 - **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
+- **Music** playback: MP3 decoding, 48 kHz resampling and the mixer's music
+  deck (local files; HTTP streaming is pending).
 - **Multi-controller input** with one pad per logged-in user and
   `useGamepad(playerIndex)`; any pad navigates the UI.
 - **Device information** (model, firmware, CPU frequency/temperature, SoC
@@ -182,6 +184,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Payloads` | Check GoldHEN BinLoader and send an ELF payload to 127.0.0.1:9090 |
 | `Sse` | Server-Sent Events stream with event polling and cancellation |
 | `WebSocket` | ws/wss text client with polling, ping/pong and close |
+| `Music` | Local MP3 playback with pause/resume/stop and volume |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Dialog` | System message dialogs (`alert`, `confirm` and `progress`) |

@@ -22,6 +22,7 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample sse
 .\tools\build_ps4.ps1 -Sample websocket
 .\tools\build_ps4.ps1 -Sample controllers
+.\tools\build_ps4.ps1 -Sample music
 ```
 
 On Linux:
@@ -65,6 +66,7 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `sse` | Server-Sent Events stream with event polling |
 | `websocket` | ws/wss text messages, echo server and polling |
 | `controllers` | Four player panels with `useGamepad(playerIndex)` |
+| `music` | Local MP3 playback with the mixer music deck |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
 font sizes each app uses.

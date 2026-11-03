@@ -193,12 +193,13 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 2.1 Música e streaming
 
-- [ ] decoders MP3/OGG/Opus (minimp3/stb_vorbis/Opus);
-- [ ] `Music.play(file|url)`, pause/resume/seek/volume;
+- [x] decoder MP3 (minimp3) com resample para 48 kHz; OGG/Opus pendentes;
+- [ ] `Music.play(file|url)`, pause/resume/seek/volume: arquivo local,
+  pause/resume/volume e stop implementados; URL/streaming e seek pendentes;
 - [ ] playlists, crossfade e metadados (título/artista/capa);
-- [ ] usar os dois decks e o `stream_ring` existentes no mixer;
+- [ ] usar os dois decks e o `stream_ring` existentes no mixer (um deck usado);
 - [ ] BGM do sistema (`sceMusicPlayerService`) quando disponível;
-- [ ] sample `music`.
+- [ ] sample `music` (criado; teste de hardware pendente).
 
 **Aceite:** tocar MP3 local e stream HTTP com crossfade, sem underrun e com
 CPU baixa.

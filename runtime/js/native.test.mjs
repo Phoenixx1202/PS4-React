@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Controller, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound, Sse, WebSocket} from './native.js';
+import {acquireImage, Archives, Controller, Dialog, Downloads, FileSystem, Http, Keyboard, Music, Packages, Payloads, Power, SaveData, Sound, Sse, WebSocket} from './native.js';
 
 test('SaveData forwards mount, unmount and remove to the host', () => {
   assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
@@ -423,6 +423,37 @@ test('Controller.getState selects the player index', () => {
     assert.equal(Controller.getState().player, 0);
     assert.equal(Controller.getState(2).player, 2);
     assert.deepEqual(players, [0, 2]);
+  } finally {
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('Music controls the mixer deck', () => {
+  const calls = [];
+  globalThis.__ps4ReactNative = {music: {
+    play: (path, volume) => { calls.push(['play', path, volume]); return 21; },
+    pause: id => { calls.push(['pause', id]); },
+    resume: id => { calls.push(['resume', id]); },
+    stop: id => { calls.push(['stop', id]); },
+    setVolume: volume => { calls.push(['volume', volume]); },
+    status: id => { calls.push(['status', id]); return {state: 'playing', position: 1, duration: 3, error: ''}; },
+  }};
+  try {
+    const music = Music.play({path: '/data/pkg/song.mp3', volume: 0.5});
+    assert.equal(music.id, 21);
+    music.pause();
+    music.resume();
+    assert.equal(music.status().state, 'playing');
+    music.stop();
+    Music.setVolume(0.25);
+    assert.deepEqual(calls, [
+      ['play', '/data/pkg/song.mp3', 0.5],
+      ['pause', 21],
+      ['resume', 21],
+      ['status', 21],
+      ['stop', 21],
+      ['volume', 0.25],
+    ]);
   } finally {
     delete globalThis.__ps4ReactNative;
   }

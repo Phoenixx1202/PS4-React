@@ -85,6 +85,8 @@
 // Failures throw a JS Error whose message names the call, the path, and strerror.
 #pragma once
 
+namespace hui::audio { class Mixer; }
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -206,6 +208,8 @@ JSValue ps4_react_sound_api(JSContext* ctx);
 // the output fails. Start before the bundle runs, stop after the runtime shuts down.
 bool ps4_react_start_sound();
 void ps4_react_stop_sound();
+void ps4_react_music_attach(hui::audio::Mixer& mixer);
+JSValue ps4_react_music_api(JSContext* ctx);
 
 // ABI v5 additive archive tasks: extract(sources, destination, maxBytes, password?), inspect(sources), cancel(id), poll().
 JSValue ps4_react_archive_api(JSContext* ctx);
