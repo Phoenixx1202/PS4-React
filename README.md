@@ -20,7 +20,8 @@ The default build produces a single installable package:
 - **Audio** through `sceAudioOut` (48 kHz stereo) and a real-time mixer.
 - **Networking** with libcurl + mbedTLS: `Http` requests and `Downloads`.
 - **Remote images** (PNG/JPEG) with an in-memory and disk cache.
-- **Archives** (ZIP, TAR, 7z) through libarchive.
+- **Archives** (ZIP, TAR, 7z) through libarchive, with ZIP/TAR creation,
+  extraction and inspection.
 - **Runtime text shaping** for CJK, Arabic and Indic scripts with HarfBuzz and
   SheenBidi; apps package only the Noto fonts they use.
 - **Native filesystem** under `/app0`, `/data` and `/download0`.

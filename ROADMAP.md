@@ -160,9 +160,9 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.9 Arquivos compactados
 
-- [ ] `Archives.create` (ZIP/TAR) com entradas, progresso e cancelamento
-  implementado; validação de hardware pendente;
-- [ ] validar TAR e 7z no hardware (ZIP já validado);
+- [x] `Archives.create` (ZIP/TAR) com entradas, progresso e cancelamento;
+  ZIP validado no hardware, TAR implementado mas ainda sem teste;
+- [ ] validar TAR e 7z no hardware (ZIP criar/extrair já validado);
 - [ ] RAR5 não criptografado e RAR criptografado (ver 2.4);
 - [ ] testes de path traversal, symlink e limites.
 
@@ -388,6 +388,11 @@ firmware/GoldHEN:
   (settings, PKG `23b166e533fbf693d27c64a73c5840cc98ddc79a193b7ee1f045583408bc6133`):
   KLog mostra `Mounted > ... mountPoint=/savedata0`, unmount no close e não
   acusa mais `save_data.png` ausente. Commit local `475b9b2`.
+- 2026-11-03 - `Archives.create` ZIP validado no hardware (sample archive, PKG
+  `85fc1b141760c59acf34a02026d5ed32094308bbf5bd7d0e65b59097b3909e68`):
+  `archives.create: wrote /data/PS4React/sample.zip (1 entries, 188905 bytes)`;
+  inspect, extract e verify do `ca-bundle.crt` (188905 bytes) funcionaram.
+  TAR implementado, mas ainda sem teste. Commit local `a1a1f4e`.
 ```
 
 ## Changelog do plano
