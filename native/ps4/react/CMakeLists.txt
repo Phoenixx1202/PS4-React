@@ -148,7 +148,6 @@ target_link_libraries(ps4_react_starter PRIVATE
     SceNetCtl
     SceUserService
     SceSystemService
-    SceLncUtil
     curl
     mbedtls
     mbedx509

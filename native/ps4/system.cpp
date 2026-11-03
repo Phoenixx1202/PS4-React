@@ -146,6 +146,31 @@ void park() {
         sceKernelUsleep(100000);
 }
 
+namespace {
+
+using LncLaunchFn = std::uint32_t (*)(const char*, const char**, LncAppParam*);
+using LncInitFn = int (*)();
+
+bool dlsym_in_module(const char* module_name, const char* symbol, void** out) {
+    OrbisKernelModule modules[256] = {};
+    std::size_t count = 0;
+    if (sceKernelGetModuleList(modules, 256, &count) != 0)
+        return false;
+    for (std::size_t i = 0; i < count && i < 256; ++i) {
+        OrbisKernelModuleInfo info{};
+        info.size = sizeof info;
+        if (sceKernelGetModuleInfo(modules[i], &info) != 0)
+            continue;
+        if (module_name && !std::strstr(info.name, module_name))
+            continue;
+        if (sceKernelDlsym(static_cast<std::int32_t>(modules[i]), symbol, out) == 0 && *out)
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
 bool relaunch(int& result) {
     OrbisAppInfo info{};
     const pid_t pid = getpid();
@@ -163,13 +188,53 @@ bool relaunch(int& result) {
     param.size = sizeof param;
     param.user_id = static_cast<std::uint32_t>(user);
     param.app_opt = 0;
-    param.LaunchAppCheck_flag = LaunchApp_None;
+    param.LaunchAppCheck_flag = LaunchApp_SkipSystemUpdate;
 
-    result = sceLncUtilLaunchApp(info.TitleId, nullptr, &param);
-    log("system: LncUtilLaunchApp(%s pid=%d user=0x%08x)=0x%08x", info.TitleId,
-        static_cast<int>(pid), static_cast<unsigned>(user),
-        static_cast<unsigned>(result));
-    return result == 0;
+    // sceLncUtilLaunchApp is exported by libSceSystemService on PS4. Calling
+    // the linked stub traps because GoldHEN does not load libSceLncUtil, so
+    // resolve the real entry point from the loaded module.
+    void* launch_symbol = nullptr;
+    if (!dlsym_in_module("libSceSystemService", "sceLncUtilLaunchApp", &launch_symbol))
+        (void)dlsym_in_module(nullptr, "sceLncUtilLaunchApp", &launch_symbol);
+
+    if (launch_symbol) {
+        void* init_symbol = nullptr;
+        if (dlsym_in_module(nullptr, "sceLncUtilInitialize", &init_symbol)) {
+            const int init_result =
+                reinterpret_cast<LncInitFn>(init_symbol)();
+            log("system: LncUtilInitialize=0x%08x", static_cast<unsigned>(init_result));
+        }
+        const auto launch = reinterpret_cast<LncLaunchFn>(launch_symbol);
+        const std::uint32_t code = launch(info.TitleId, nullptr, &param);
+        result = static_cast<int>(code);
+        log("system: LncUtilLaunchApp(%s pid=%d user=0x%08x)=0x%08x",
+            info.TitleId, static_cast<int>(pid), static_cast<unsigned>(user), code);
+        if ((code & 0x80000000u) == 0 ||
+            code == 0x80a40043u || code == 0x80940010u)
+            return true;
+    } else {
+        result = -1;
+        log("system: sceLncUtilLaunchApp not exported by the loaded modules");
+    }
+
+    // The same title is already running, so LNC refuses the launch. Replace
+    // this process image with the app's own eboot instead. libSceSystemService
+    // exports both the LncUtil and SystemService entry points.
+    void* exec_symbol = nullptr;
+    if (dlsym_in_module(nullptr, "sceLncUtilLoadExec", &exec_symbol)) {
+        const auto exec = reinterpret_cast<int (*)(const char*, const char**)>(exec_symbol);
+        const int exec_result = exec("/app0/eboot.bin", nullptr);
+        log("system: LncUtilLoadExec(/app0/eboot.bin)=0x%08x",
+            static_cast<unsigned>(exec_result));
+        if (exec_result == 0) {
+            result = 0;
+            return true;
+        }
+    }
+    const int exec_result = sceSystemServiceLoadExec("/app0/eboot.bin", nullptr);
+    log("system: LoadExec(/app0/eboot.bin)=0x%08x", static_cast<unsigned>(exec_result));
+    result = exec_result;
+    return exec_result == 0;
 }
 
 bool request_close() {
