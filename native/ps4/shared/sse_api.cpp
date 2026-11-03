@@ -33,6 +33,7 @@ struct Task {
     std::string url;
     std::vector<std::string> headers;
     std::atomic<State> state{State::connecting};
+    State reported = State::connecting;
     std::atomic<bool> cancelled{false};
     std::mutex mutex;
     std::deque<Event> events;
@@ -283,6 +284,10 @@ JSValue poll(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
         const auto& task = *it;
         if (task->id != id) continue;
         const State state = task->state;
+        if (task->reported != state) {
+            task->reported = state;
+            ps4::system::log("sse: poll %u state=%s", task->id, state_name(state));
+        }
         JS_SetPropertyStr(ctx, out, "state", JS_NewString(ctx, state_name(state)));
         {
             std::lock_guard<std::mutex> task_lock(task->mutex);
