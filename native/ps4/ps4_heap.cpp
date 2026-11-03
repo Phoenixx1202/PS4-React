@@ -19,6 +19,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "app_config.generated.h"
+
 extern "C" {
 int32_t sceKernelDebugOutText(int32_t channel, const char* format, ...);
 int32_t sceKernelAvailableFlexibleMemorySize(size_t* size);
@@ -141,10 +143,19 @@ mspace create_direct_heap(size_t size) {
 }
 
 mspace create_heap() {
+#if PS4_REACT_GPU
+    // Piglet reserves its own system/video shared memory; leave it room by
+    // keeping the UI heap smaller than the software-only 512 MiB default.
+    for (size_t size : {128 * kMiB, 96 * kMiB, 64 * kMiB}) {
+        if (mspace result = map_heap(true, size))
+            return result;
+    }
+#else
     for (size_t size : {512 * kMiB, 384 * kMiB, 256 * kMiB, 192 * kMiB, 128 * kMiB}) {
         if (mspace result = map_heap(true, size))
             return result;
     }
+#endif
     for (size_t size : {256 * kMiB, 128 * kMiB}) {
         if (mspace result = map_heap(false, size))
             return result;

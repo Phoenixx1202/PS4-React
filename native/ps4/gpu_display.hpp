@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace ps4 {
 
@@ -37,8 +38,12 @@ class GpuDisplay {
     void* context_ = nullptr;
     unsigned program_ = 0;
     unsigned texture_ = 0;
-    int position_ = -1;
-    int uv_ = -1;
+    std::vector<std::uint8_t> staging_;
+    int vertex_ = -1;
+    int model_ = -1;
+    int projection_ = -1;
+    int texture_space_ = -1;
+    int opacity_ = -1;
     int sampler_ = -1;
 };
 

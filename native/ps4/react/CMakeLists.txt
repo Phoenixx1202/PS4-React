@@ -100,7 +100,7 @@ add_executable(ps4_react_starter
 
 if(PS4_REACT_GPU)
     target_sources(ps4_react_starter PRIVATE ../gpu_display.cpp)
-    target_link_libraries(ps4_react_starter PRIVATE ScePigletv2VSH)
+    target_link_libraries(ps4_react_starter PRIVATE ScePigletv2VSH ScePrecompiledShaders)
 endif()
 
 if(PS4_REACT_DEV_SERVER)
