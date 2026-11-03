@@ -150,32 +150,19 @@ void exit_app() {
     log("system: requesting title closure");
     std::fflush(nullptr);
 
-    // LoadExec("exit") is rejected on some firmware, including the setup used
-    // here (0x80a10005). The system's own close path takes the running app id.
-    log("system: GetAppIdOfBigApp");
-    int app = sceSystemServiceGetAppIdOfBigApp();
-    log("system: big app id=0x%08x", static_cast<unsigned>(app));
-    if (app <= 0) {
-        log("system: GetAppIdOfMiniApp");
-        app = sceSystemServiceGetAppIdOfMiniApp();
-        log("system: mini app id=0x%08x", static_cast<unsigned>(app));
-    }
-    if (app > 0) {
-        log("system: calling KillApp");
-        const int killed = sceSystemServiceKillApp(
-            static_cast<std::uint32_t>(app), -1, 0, 0);
-        log("system: KillApp returned=0x%08x", static_cast<unsigned>(killed));
-        if (killed == 0) {
-            log("system: KillApp accepted; exiting process");
-            _exit(0);
-        }
-    } else {
-        log("system: no running app id");
-    }
-
+    // Ask the system to close the title. This is rejected on the firmware used
+    // here (0x80a10005), and sceSystemServiceKillApp leaves the caller parked
+    // behind the launch splash instead of ending it. The reliable path is to
+    // leave the loop and terminate this process; the shell then reclaims the
+    // display once the process is gone.
     const int result = sceSystemServiceLoadExec("exit", nullptr);
     log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
-    log("system: exiting process after rejected close request");
+    if (result == 0) {
+        log("system: close accepted; waiting for the system");
+        park();
+    }
+
+    log("system: terminating process");
     _exit(0);
 }
 
