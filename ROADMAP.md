@@ -272,6 +272,12 @@ silenciosa. Validado no hardware; a auditoria formal fica pendente.
   (Piglet/EGL) opt-in por `"gpu": true`, com fallback software; validada no
   hardware com shaders pré-compilados da Sony (`texmap`);
 - [ ] atlas de textura, batching, scissor, blend e shaders para a UI 2D;
+  bloqueado com os shaders pré-compilados da Sony: `texmap/v_0`, `v_1` e `v_2`
+  derivam a UV da posição do vértice via `u_textureSpaceMatrix`, então cada
+  quad exigiria um draw call próprio. O probe em hardware confirmou que nenhuma
+  variante aceita UV por vértice. Para destravar seria preciso um shader PSSL
+  próprio (ShaccCg) ou GNM; o caminho validado continua sendo composição
+  software + upload GPU;
 - [ ] textura de vídeo/imagem e upload assíncrono;
 - [x] manter o software como fallback e para CI;
 - [ ] comparar fps, memória e qualidade nos samples (GPU ~32 fps contra ~40 fps
@@ -443,6 +449,12 @@ firmware/GoldHEN:
   primeiro frame apresentado. O sample é IV0000/gde (compositor VSH) e usa
   heap de 128 MiB. ~32 fps por causa da conversão/upload por frame; batching e
   otimização pendentes. Commit local `9a3928f`.
+- 2026-11-03 - tentativa de backend GPU de UI (FBO + atlas + batching) foi
+  revertida: os shaders `texmap/v_0`, `v_1` e `v_2` calculam a UV a partir da
+  posição, então não aceitam UV por vértice e cada operação exigiria um draw
+  call. O probe em hardware confirmou o bloqueio; o caminho software +
+  apresentação GPU (PKG `35b687e14d5aa2f9e375a57b86a9d91a9e5263ba9c57676391e1923ae4a85f5f`)
+  foi restaurado e validado. Sem push.
 ```
 
 ## Changelog do plano
