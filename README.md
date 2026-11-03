@@ -24,7 +24,8 @@ The default build produces a single installable package:
 - **Runtime text shaping** for CJK, Arabic and Indic scripts with HarfBuzz and
   SheenBidi; apps package only the Noto fonts they use.
 - **Native filesystem** under `/app0`, `/data` and `/download0`.
-- **PKG installation** through `sceAppInstUtil` via `Packages.install`.
+- **PKG installation and removal** through `sceAppInstUtil` via
+  `Packages.install`/`Packages.uninstall`, with progress and errors.
 - **Save data** through `sceSaveData` and the system on-screen keyboard through
   `sceImeDialog`.
 - **PKG packaging** validated with `PkgTool.Core` and a load-image checker.
@@ -167,6 +168,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `FileSystem` | Read, write, list, rename and inspect files |
 | `Controller` / `useGamepad` | Light bar, vibration and pad state |
 | `Packages.install` | Install a PKG through `sceAppInstUtil` |
+| `Packages.uninstall` | Remove an installed title through `sceAppInstUtil` |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Dialog` | System message dialogs (`alert` and `confirm`) |

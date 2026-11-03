@@ -497,10 +497,12 @@ export const Archives = Object.freeze({
 });
 
 /**
- * PKG installation through the console's install service (`sceAppInstUtil`).
- * The task's snapshot carries `written`/`total` bytes, the console's install `status` and the
- * package's `titleId`; it completes when the install service returns. Cancelling stops reporting
- * only; an install the console accepted carries on.
+ * PKG installation and removal through the console's install service
+ * (`sceAppInstUtil`). The task's snapshot carries the install `percent`, the
+ * console's `installState`/`status`, the package's `titleId`/`contentId` and,
+ * when the service reports it, `written`/`total` sizes. It completes when the
+ * service returns. Cancelling stops reporting only; an install the console
+ * accepted carries on.
  */
 export const Packages = Object.freeze({
   install({path, name = ''}) {
@@ -510,6 +512,18 @@ export const Packages = Object.freeze({
     }
     const id = backend.install(path, name);
     return networkTask(id, 'Packages.install', path, 'packages');
+  },
+  /** Uninstalls an installed title by its nine-character title id. */
+  uninstall({titleId}) {
+    if (typeof titleId !== 'string' || !/^[A-Z0-9]{9}$/.test(titleId)) {
+      throw new TypeError('Packages.uninstall: titleId must be a nine-character uppercase id');
+    }
+    const backend = host().packages;
+    if (typeof backend?.uninstall !== 'function') {
+      throw new Error('Packages.uninstall is not available on this host');
+    }
+    const id = backend.uninstall(titleId);
+    return networkTask(id, 'Packages.uninstall', titleId, 'packages');
   },
 });
 

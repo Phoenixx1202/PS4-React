@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Downloads, FileSystem, Http, Keyboard, Power, SaveData, Sound} from './native.js';
+import {acquireImage, Archives, Downloads, FileSystem, Http, Keyboard, Packages, Power, SaveData, Sound} from './native.js';
 
 test('SaveData forwards mount, unmount and remove to the host', () => {
   assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
@@ -225,6 +225,46 @@ test('archive and download task IDs are isolated while sharing the polling timer
     assert.equal(download.snapshot.state, 'queued');
     networkSnapshots = [{id: 1, state: 'completed', written: 100}]; tick();
     assert.equal((await download.done).written, 100);
+  } finally {
+    globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('Packages installs and uninstalls through the host', async () => {
+  let tick, snapshots = [];
+  const calls = [];
+  const originalInterval = globalThis.setInterval;
+  const originalClear = globalThis.clearInterval;
+  globalThis.setInterval = callback => { tick = callback; return 1; };
+  globalThis.clearInterval = () => {};
+  globalThis.__ps4ReactNative = {packages: {
+    install: (...args) => { calls.push(['install', ...args]); return 1; },
+    uninstall: (...args) => { calls.push(['uninstall', ...args]); return 2; },
+    cancel: () => {},
+    poll: () => snapshots,
+  }};
+  try {
+    const install = Packages.install({path: '/data/pkg/counter.pkg'});
+    assert.equal(install.id, 1);
+    assert.deepEqual(calls, [['install', '/data/pkg/counter.pkg', '']]);
+    snapshots = [{id: 1, state: 'installing', percent: 42, titleId: 'CUSA99060',
+      contentId: 'UP0001-CUSA99060_00-PS4SAMPCOUNTER01', error: ''}];
+    tick();
+    assert.equal(install.snapshot.percent, 42);
+    snapshots = [{id: 1, state: 'completed', percent: 100}];
+    tick();
+    assert.equal((await install.done).percent, 100);
+
+    const remove = Packages.uninstall({titleId: 'CUSA99060'});
+    assert.deepEqual(calls.slice(1), [['uninstall', 'CUSA99060']]);
+    snapshots = [{id: 2, state: 'uninstalling', percent: 0, error: ''}];
+    tick();
+    assert.equal(remove.snapshot.state, 'uninstalling');
+    snapshots = [{id: 2, state: 'completed', percent: 0}];
+    tick();
+    assert.equal((await remove.done).state, 'completed');
+    assert.throws(() => Packages.uninstall({titleId: 'cusa99060'}), /nine-character/);
   } finally {
     globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
     delete globalThis.__ps4ReactNative;

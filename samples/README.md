@@ -13,6 +13,7 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample images
 .\tools\build_ps4.ps1 -Sample files
 .\tools\build_ps4.ps1 -Sample settings
+.\tools\build_ps4.ps1 -Sample packages
 ```
 
 On Linux:
@@ -47,6 +48,7 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `files` | `FileSystem.writeFile`, `readFile` and `readDir` under `/download0` |
 | `settings` | `SaveData.mount` and `Keyboard.prompt`, persisting JSON in save data |
 | `dialogs` | `Dialog.alert` and `Dialog.confirm` through the system message dialog |
+| `packages` | `Packages.install`/`Packages.uninstall` with progress and errors |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
 font sizes each app uses.
