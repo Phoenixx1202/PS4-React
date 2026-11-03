@@ -595,6 +595,27 @@ export const Payloads = Object.freeze({
   },
 });
 
+/**
+ * Server-Sent Events client. `connect` starts an HTTP stream on a worker
+ * thread; `poll` returns `{state, error, events}` and drains queued events.
+ * `close` asks the worker to stop.
+ */
+export const Sse = Object.freeze({
+  /** @param {{url: string, headers?: string[]}} options */
+  connect({url, headers = []} = {}) {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url))
+      throw new TypeError('Sse.connect: URL must start with http:// or https://');
+    if (!Array.isArray(headers) || headers.some(header => typeof header !== 'string'))
+      throw new TypeError('Sse.connect: headers must be an array of strings');
+    const id = host().sse.connect(url, headers);
+    return Object.freeze({
+      id,
+      poll: () => host().sse.poll(id),
+      close: () => host().sse.close(id),
+    });
+  },
+});
+
 const pendingImages = new Map();
 let stopImagePolling = null;
 

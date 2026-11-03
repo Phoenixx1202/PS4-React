@@ -84,6 +84,7 @@ add_executable(ps4_react_starter
     ../shared/archives.cpp
     ../shared/archive_api.cpp
     ../shared/archive_create_api.cpp
+    ../shared/sse_api.cpp
     ../shared/archive_writer.cpp
     ../shared/archive_preflight_stub.cpp
     ../shared/rar5_password_stub.cpp

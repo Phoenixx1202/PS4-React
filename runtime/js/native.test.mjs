@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound} from './native.js';
+import {acquireImage, Archives, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound, Sse} from './native.js';
 
 test('SaveData forwards mount, unmount and remove to the host', () => {
   assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
@@ -358,6 +358,30 @@ test('Archives.create runs through the archive-create backend', async () => {
     assert.throws(() => Archives.create({sources: ['/app0/app.json'], destination: '/download0/out.rar', format: 'rar'}), /zip.*tar/);
   } finally {
     globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('Sse connects, polls events and closes', () => {
+  const calls = [];
+  globalThis.__ps4ReactNative = {sse: {
+    connect: (...args) => { calls.push(['connect', ...args]); return 11; },
+    poll: id => { calls.push(['poll', id]); return {state: 'open', error: '', events: [
+      {type: 'message', data: 'hello', id: '1'}]}; },
+    close: id => { calls.push(['close', id]); },
+  }};
+  try {
+    const stream = Sse.connect({url: 'https://example.com/events', headers: ['Accept: text/event-stream']});
+    assert.equal(stream.id, 11);
+    assert.deepEqual(stream.poll().events, [{type: 'message', data: 'hello', id: '1'}]);
+    stream.close();
+    assert.deepEqual(calls, [
+      ['connect', 'https://example.com/events', ['Accept: text/event-stream']],
+      ['poll', 11],
+      ['close', 11],
+    ]);
+    assert.throws(() => Sse.connect({url: 'ftp://example.com'}), /http/);
+  } finally {
     delete globalThis.__ps4ReactNative;
   }
 });

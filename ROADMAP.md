@@ -154,9 +154,10 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 ### 1.8 Rede avançada
 
 - [ ] WebSocket cliente (texto/binário, ping/pong, reconexão);
-- [ ] SSE/streaming HTTP para respostas longas;
+- [ ] SSE/streaming HTTP para respostas longas (cliente `Sse` implementado,
+  com fila limitada a 256 eventos; falta validação de hardware);
 - [ ] limites de memória e backpressure;
-- [ ] servidor de teste local e testes automatizados.
+- [ ] servidor de teste local e testes automatizados (teste JS de `Sse` feito).
 
 ### 1.9 Arquivos compactados
 
