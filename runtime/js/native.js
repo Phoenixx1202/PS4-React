@@ -540,11 +540,11 @@ export const Packages = Object.freeze({
  * and /temp0, requires an ELF header and caps the file at 64 MiB.
  */
 export const Payloads = Object.freeze({
-  /** @returns {boolean} whether BinLoader accepts a connection */
+  /** @returns {boolean} whether GoldHEN's config has BinLoader enabled */
   isAvailable: () => host().payloads.isAvailable(),
-  /** @returns {{available: boolean, loopback: boolean, lan: boolean, ftpLoopback: boolean,
-   *   ftpTcp: boolean, ip: string, port: number, loopbackError: number, lanError: number,
-   *   ftpLoopbackError: number, ftpLanError: number}} */
+  /** Reads GoldHEN's config instead of probing the port: a bare TCP connect can
+   * stop BinLoader's accept loop. @returns {{available: boolean, configured: boolean,
+   *   ip: string, port: number}} */
   diagnose: () => host().payloads.diagnose(),
   /** @param {{path: string}} options @returns {ReturnType<typeof networkTask>} */
   send({path}) {

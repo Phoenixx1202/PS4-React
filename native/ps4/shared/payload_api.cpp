@@ -19,6 +19,7 @@
 #include <cerrno>
 #include <climits>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -141,53 +142,36 @@ std::uint32_t local_address() {
     return address.s_addr;
 }
 
-struct Probe {
-    bool loopback = false;
-    bool lan = false;
-    bool ftp_loopback = false;
-    bool ftp_lan = false;
-    int loopback_error = 0;
-    int lan_error = 0;
-    int ftp_loopback_error = 0;
-    int ftp_lan_error = 0;
-    std::string ip;
-};
-
-int probe_port(std::uint32_t address, std::uint16_t port, int timeout_ms, bool& open) {
-    const int fd = connect_address(address, port, timeout_ms);
-    if (fd >= 0) {
-        close(fd);
-        open = true;
-        return 0;
-    }
-    open = false;
-    return errno;
-}
-
-Probe probe_binloader(int timeout_ms) {
-    Probe probe;
-
-    const std::uint32_t loopback = htonl(INADDR_LOOPBACK);
-    probe.loopback_error = probe_port(loopback, kPort, timeout_ms, probe.loopback);
-
+std::string local_ip() {
     OrbisNetCtlInfo info{};
     if (sceNetCtlGetInfo(ORBIS_NET_CTL_INFO_IP_ADDRESS, &info) == 0)
-        probe.ip = info.ip_address;
-    const std::uint32_t address = local_address();
-    if (address)
-        probe.lan_error = probe_port(address, kPort, timeout_ms, probe.lan);
-    else
-        probe.lan_error = ENETUNREACH;
+        return info.ip_address;
+    return {};
+}
 
-    // The FTP server on 2121 is always enabled. Probing it tells a closed port
-    // from a network namespace that cannot reach the console's own services.
-    probe.ftp_loopback_error = probe_port(loopback, 2121, timeout_ms, probe.ftp_loopback);
-    if (address)
-        probe.ftp_lan_error = probe_port(address, 2121, timeout_ms, probe.ftp_lan);
-    else
-        probe.ftp_lan_error = ENETUNREACH;
-
-    return probe;
+// A bare TCP connect to GoldHEN's BinLoader can terminate its single-threaded
+// accept loop, so never probe the port. Read the server setting instead and let
+// the actual send be the test.
+bool binloader_enabled() {
+    std::FILE* file = std::fopen("/data/GoldHEN/config.ini", "rb");
+    if (!file) return false;
+    char line[256];
+    bool section = false;
+    bool enabled = false;
+    while (std::fgets(line, sizeof line, file)) {
+        char* start = line;
+        while (*start == ' ' || *start == '\t') ++start;
+        if (*start == '[') {
+            section = std::strncmp(start, "[BinLoader]", 11) == 0;
+            continue;
+        }
+        if (!section) continue;
+        if (std::strncmp(start, "Enabled", 7) != 0) continue;
+        char* equals = std::strchr(start, '=');
+        if (equals) enabled = std::atoi(equals + 1) != 0;
+    }
+    std::fclose(file);
+    return enabled;
 }
 
 bool send_all(int fd, const char* data, std::size_t size) {
@@ -197,6 +181,7 @@ bool send_all(int fd, const char* data, std::size_t size) {
             if (errno == EINTR) continue;
             return false;
         }
+        if (written == 0) return false;
         data += written;
         size -= static_cast<std::size_t>(written);
     }
@@ -238,7 +223,7 @@ void run(Task& task) {
         const int probe_lan = address ? connect_address(address, kPort, 3000) : -1;
         if (probe_lan < 0) {
             close(fd);
-            fail(task, "BinLoader is not reachable at 127.0.0.1:9090", errno);
+            fail(task, "BinLoader is not accepting connections on 127.0.0.1 or the LAN address", errno);
             return;
         }
         task.socket = probe_lan;
@@ -308,36 +293,19 @@ void start(const std::shared_ptr<Task>& task) {
 }
 
 JSValue available(JSContext* ctx, JSValueConst, int, JSValueConst*) {
-    const Probe probe = probe_binloader(500);
-    ps4::system::log("payloads: probe loopback=0x%08x lan=%s=0x%08x ftp-loopback=0x%08x ftp-lan=0x%08x",
-                     static_cast<unsigned>(probe.loopback_error),
-                     probe.ip.empty() ? "?" : probe.ip.c_str(),
-                     static_cast<unsigned>(probe.lan_error),
-                     static_cast<unsigned>(probe.ftp_loopback_error),
-                     static_cast<unsigned>(probe.ftp_lan_error));
-    return JS_NewBool(ctx, probe.loopback || probe.lan);
+    return JS_NewBool(ctx, binloader_enabled());
 }
 
 JSValue diagnose(JSContext* ctx, JSValueConst, int, JSValueConst*) {
-    const Probe probe = probe_binloader(500);
-    ps4::system::log("payloads: probe loopback=0x%08x lan=%s=0x%08x ftp-loopback=0x%08x ftp-lan=0x%08x",
-                     static_cast<unsigned>(probe.loopback_error),
-                     probe.ip.empty() ? "?" : probe.ip.c_str(),
-                     static_cast<unsigned>(probe.lan_error),
-                     static_cast<unsigned>(probe.ftp_loopback_error),
-                     static_cast<unsigned>(probe.ftp_lan_error));
+    const bool enabled = binloader_enabled();
+    const std::string ip = local_ip();
+    ps4::system::log("payloads: BinLoader configured=%d ip=%s port=%d",
+                     enabled ? 1 : 0, ip.empty() ? "?" : ip.c_str(), kPort);
     JSValue out = JS_NewObject(ctx);
-    JS_SetPropertyStr(ctx, out, "available", JS_NewBool(ctx, probe.loopback || probe.lan));
-    JS_SetPropertyStr(ctx, out, "loopback", JS_NewBool(ctx, probe.loopback));
-    JS_SetPropertyStr(ctx, out, "lan", JS_NewBool(ctx, probe.lan));
-    JS_SetPropertyStr(ctx, out, "ftpLoopback", JS_NewBool(ctx, probe.ftp_loopback));
-    JS_SetPropertyStr(ctx, out, "ftpTcp", JS_NewBool(ctx, probe.ftp_lan));
-    JS_SetPropertyStr(ctx, out, "ip", JS_NewString(ctx, probe.ip.c_str()));
+    JS_SetPropertyStr(ctx, out, "available", JS_NewBool(ctx, enabled));
+    JS_SetPropertyStr(ctx, out, "configured", JS_NewBool(ctx, enabled));
+    JS_SetPropertyStr(ctx, out, "ip", JS_NewString(ctx, ip.c_str()));
     JS_SetPropertyStr(ctx, out, "port", JS_NewInt32(ctx, kPort));
-    JS_SetPropertyStr(ctx, out, "loopbackError", JS_NewInt32(ctx, probe.loopback_error));
-    JS_SetPropertyStr(ctx, out, "lanError", JS_NewInt32(ctx, probe.lan_error));
-    JS_SetPropertyStr(ctx, out, "ftpLoopbackError", JS_NewInt32(ctx, probe.ftp_loopback_error));
-    JS_SetPropertyStr(ctx, out, "ftpLanError", JS_NewInt32(ctx, probe.ftp_lan_error));
     return out;
 }
 

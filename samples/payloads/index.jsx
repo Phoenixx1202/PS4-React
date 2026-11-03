@@ -29,10 +29,8 @@ function App() {
   const check = () => {
     setError('');
     const info = Payloads.diagnose();
-    setStatus(info.available ? 'BinLoader is reachable.' : 'BinLoader is not available.');
-    setDetail(`loopback: ${info.loopback ? 'ok' : `error ${info.loopbackError}`}  |  `
-      + `${info.ip || '?'}:${info.port}: ${info.lan ? 'ok' : `error ${info.lanError}`}  |  `
-      + `FTP 2121: ${info.ftpLoopback || info.ftpTcp ? 'ok' : `error ${info.ftpLoopbackError}`}`);
+    setStatus(info.available ? 'BinLoader is enabled in GoldHEN.' : 'BinLoader is disabled in GoldHEN.');
+    setDetail(`Config: /data/GoldHEN/config.ini  |  ${info.ip || '?'}:${info.port}`);
   };
 
   const send = async () => {
