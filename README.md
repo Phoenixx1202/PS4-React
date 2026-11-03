@@ -29,6 +29,8 @@ The default build produces a single installable package:
   `Packages.install`/`Packages.uninstall`, with progress and errors. Apps that
   use it are packaged with `"privileged": true` (`IV0000`/`gde`).
 - **Payload delivery** to GoldHEN's BinLoader with ELF and size checks.
+- **Device information** (model, firmware, CPU frequency/temperature, SoC
+  temperature, free flexible memory) and user enumeration.
 - **Save data** through `sceSaveData` and the system on-screen keyboard through
   `sceImeDialog`.
 - **PKG packaging** validated with `PkgTool.Core` and a load-image checker.

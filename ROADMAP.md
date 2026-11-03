@@ -174,11 +174,13 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.11 Samples que faltam
 
-- [ ] `audio` (Sound.play)
+- [ ] `audio` (Sound.play) — sample com WAV empacotado implementado; teste de
+  hardware pendente;
 - [ ] `downloads` (progresso/cancelar/retomar)
-- [ ] `archive` (extrair/criar)
+- [x] `archive` (extrair/criar) — ZIP criar/inspecionar/extrair validado;
 - [ ] `text` (CJK/árabe/Indic)
-- [ ] `device` (DeviceInfo/Users/Notifications)
+- [x] `device` (DeviceInfo/Users/Notifications) — validado, incluindo
+  temperatura via `libkernel_sys` e memória flexível disponível;
 - [ ] `gallery` (imagens + ScrollView)
 - [ ] `list` (VirtualList com centenas de linhas)
 
@@ -393,6 +395,12 @@ firmware/GoldHEN:
   `archives.create: wrote /data/PS4React/sample.zip (1 entries, 188905 bytes)`;
   inspect, extract e verify do `ca-bundle.crt` (188905 bytes) funcionaram.
   TAR implementado, mas ainda sem teste. Commit local `a1a1f4e`.
+- 2026-11-03 - sample device validado no hardware (PKG
+  `aa76aa5bc0e3dff7de9d93da7bee521169d27516e882c80d887e048c85c12168`):
+  memória flexível disponível via `sceKernelAvailableFlexibleMemorySize` e
+  temperaturas de CPU/SoC via `sceKernelGetCpuTemperature`/
+  `sceKernelGetSocSensorTemperature` resolvidas de `libkernel_sys` com
+  `sceKernelDlsym`. Commit local `41efc60`.
 ```
 
 ## Changelog do plano
