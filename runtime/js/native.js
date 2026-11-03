@@ -542,8 +542,9 @@ export const Packages = Object.freeze({
 export const Payloads = Object.freeze({
   /** @returns {boolean} whether BinLoader accepts a connection */
   isAvailable: () => host().payloads.isAvailable(),
-  /** @returns {{available: boolean, loopback: boolean, lan: boolean, ip: string,
-   *   port: number, loopbackError: number, lanError: number}} */
+  /** @returns {{available: boolean, loopback: boolean, lan: boolean, ftpLoopback: boolean,
+   *   ftpTcp: boolean, ip: string, port: number, loopbackError: number, lanError: number,
+   *   ftpLoopbackError: number, ftpLanError: number}} */
   diagnose: () => host().payloads.diagnose(),
   /** @param {{path: string}} options @returns {ReturnType<typeof networkTask>} */
   send({path}) {

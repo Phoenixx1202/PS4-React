@@ -31,7 +31,8 @@ function App() {
     const info = Payloads.diagnose();
     setStatus(info.available ? 'BinLoader is reachable.' : 'BinLoader is not available.');
     setDetail(`loopback: ${info.loopback ? 'ok' : `error ${info.loopbackError}`}  |  `
-      + `${info.ip || '?'}:${info.port}: ${info.lan ? 'ok' : `error ${info.lanError}`}`);
+      + `${info.ip || '?'}:${info.port}: ${info.lan ? 'ok' : `error ${info.lanError}`}  |  `
+      + `FTP 2121: ${info.ftpLoopback || info.ftpTcp ? 'ok' : `error ${info.ftpLoopbackError}`}`);
   };
 
   const send = async () => {
