@@ -150,26 +150,30 @@ bool request_close() {
     log("system: requesting title closure");
     std::fflush(nullptr);
 
-    // Ask the system to close the title. The system accepts this only while the
-    // app still owns its display, so callers try it before tearing down VideoOut
-    // and the rest of the process state.
+    // GetAppIdOfBigApp fails inside a game with LNC 0x8094000f. The kernel app
+    // info carries the app id the system service expects.
+    OrbisAppInfo info{};
+    const pid_t pid = getpid();
+    const int info_result = sceKernelGetAppInfo(pid, &info);
+    log("system: GetAppInfo(pid=%d)=0x%08x appId=0x%08x",
+        static_cast<int>(pid), static_cast<unsigned>(info_result),
+        static_cast<unsigned>(info.AppId));
+    if (info_result == 0 && info.AppId > 0) {
+        // The same call the system uses for Close Application: it closes the
+        // title and returns to the home screen without going through the
+        // shell's PS-button flow.
+        const int killed = sceSystemServiceKillApp(
+            static_cast<std::uint32_t>(info.AppId), -1, 0, 0);
+        log("system: KillApp(0x%08x)=0x%08x", static_cast<unsigned>(info.AppId),
+            static_cast<unsigned>(killed));
+        if (killed == 0)
+            return true;
+    }
+
+    // Older firmware may still take the exit sentinel.
     const int result = sceSystemServiceLoadExec("exit", nullptr);
     log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
     return result == 0;
-}
-
-void go_home() {
-    // The close request was refused. Return to the dashboard with the display
-    // still alive; the shell suspends the app in the background. Do not call
-    // _exit here: the app sandbox turns it into SIGSYS and the system reports a
-    // crash over a clean close.
-    sceSystemServiceNavigateToGoHome();
-    log("system: NavigateToGoHome requested");
-    park();
-}
-
-void exit_app() {
-    go_home();
 }
 
 } // namespace ps4::system

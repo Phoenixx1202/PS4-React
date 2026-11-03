@@ -327,7 +327,9 @@ int main() {
         ps4::system::park();
     }
 
-    // Refused: return to the dashboard with the UI still alive. The shell
-    // suspends the app in the background; _exit would be SIGSYS and a crash.
-    ps4::system::go_home();
+    // The close request failed. Keep the UI alive; the user can close the app
+    // from the dashboard. Do not call NavigateToGoHome (it crashes the shell
+    // here) or _exit (SIGSYS, reported as a crash).
+    ps4::system::log("system: close request failed; leaving the app running");
+    ps4::system::park();
 }

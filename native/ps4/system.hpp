@@ -25,15 +25,8 @@ void hide_splash();
 
 [[noreturn]] void park();
 
-// Tries the system close request while the app still owns its display and
-// focus. Returns true when the shell accepted it.
+// Tries the system close request. Uses the caller's app id from the kernel app
+// info; GetAppIdOfBigApp fails inside a game on this firmware.
 bool request_close();
-
-// Navigates to the dashboard and parks. Used when the close request is
-// refused; the shell suspends the app in the background.
-[[noreturn]] void go_home();
-
-// Fallback used after teardown: navigate home and park.
-[[noreturn]] void exit_app();
 
 } // namespace ps4::system
