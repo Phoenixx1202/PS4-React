@@ -269,11 +269,13 @@ silenciosa. Validado no hardware; a auditoria formal fica pendente.
 
 - [ ] spike de backend: OpenGL ES/Piglet versus GNM (PS4);
 - [x] abstração `Renderer` com implementação software e apresentação GPU
-  (Piglet/EGL) opt-in por `"gpu": true`, com fallback software;
+  (Piglet/EGL) opt-in por `"gpu": true`, com fallback software; validada no
+  hardware com shaders pré-compilados da Sony (`texmap`);
 - [ ] atlas de textura, batching, scissor, blend e shaders para a UI 2D;
 - [ ] textura de vídeo/imagem e upload assíncrono;
 - [x] manter o software como fallback e para CI;
-- [ ] comparar fps, memória e qualidade nos samples.
+- [ ] comparar fps, memória e qualidade nos samples (GPU ~32 fps contra ~40 fps
+  software no sample gpu; o upload/conversão por frame ainda pesa).
 
 **Aceite:** starter e samples visualmente equivalentes a 1080p60 no GPU, com
 fallback software funcionando.
@@ -434,6 +436,13 @@ firmware/GoldHEN:
   `PS4 React Starter: pads=1 users=1`, Player 1 conectado e estados por
   jogador via `Controller.getState`/`useGamepad(playerIndex)`. Commit local
   `5f728af`. Falta o teste com dois controles e eventos de login/logout.
+- 2026-11-03 - GPU/Piglet validado no hardware (sample gpu, PKG
+  `435b84596a52ea9911306b787c6f9b59f1532096e0f24a2c91f0485e03783de2`):
+  `gpu: GL_VERSION=OpenGL ES 2.0 Piglet`, shaders pré-compilados
+  `texmap/v_2.vert`/`f_2.frag` via `glShaderBinary`, `gpu presentation=yes` e
+  primeiro frame apresentado. O sample é IV0000/gde (compositor VSH) e usa
+  heap de 128 MiB. ~32 fps por causa da conversão/upload por frame; batching e
+  otimização pendentes. Commit local `9a3928f`.
 ```
 
 ## Changelog do plano
