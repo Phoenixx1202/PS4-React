@@ -248,4 +248,19 @@ size_t ps4_replace_malloc_usable_size(void* pointer) {
     return pointer ? mspace_usable_size(pointer) : 0;
 }
 
+// The app's own malloc family goes through these wrappers. libc's internal
+// allocations use the replacement table above, but the app's first calloc is
+// resolved at link time; without --wrap it still enters libc's broken heap
+// setup before that table is consulted.
+void* __wrap_malloc(size_t size) { return ps4_replace_malloc(size); }
+void __wrap_free(void* pointer) { ps4_replace_free(pointer); }
+void* __wrap_calloc(size_t count, size_t size) { return ps4_replace_calloc(count, size); }
+void* __wrap_realloc(void* pointer, size_t size) { return ps4_replace_realloc(pointer, size); }
+void* __wrap_memalign(size_t boundary, size_t size) {
+    return ps4_replace_memalign(boundary, size);
+}
+int __wrap_posix_memalign(void** output, size_t boundary, size_t size) {
+    return ps4_replace_posix_memalign(output, boundary, size);
+}
+
 } // extern "C"

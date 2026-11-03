@@ -158,6 +158,17 @@ target_link_libraries(ps4_react_starter PRIVATE
     pthread
 )
 
+# The app's own malloc family must bypass libc's heap setup. libc's internal
+# allocations use the replacement table in ps4_crt1.S; these wrappers cover the
+# objects linked into the app, including libcurl's calloc.
+target_link_options(ps4_react_starter PRIVATE
+    --wrap=malloc
+    --wrap=free
+    --wrap=calloc
+    --wrap=realloc
+    --wrap=memalign
+    --wrap=posix_memalign)
+
 if(COMMAND add_self)
     add_self(ps4_react_starter)
 
