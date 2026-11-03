@@ -498,6 +498,7 @@ void ps4_react_install_host_api(JSContext* ctx) {
   JS_SetPropertyStr(ctx, api, "archives", ps4_react_archive_api(ctx));
   JS_SetPropertyStr(ctx, api, "archiveCreate", ps4_react_archive_create_api(ctx));
   JS_SetPropertyStr(ctx, api, "sse", ps4_react_sse_api(ctx));
+  JS_SetPropertyStr(ctx, api, "websocket", ps4_react_websocket_api(ctx));
   JS_SetPropertyStr(ctx, api, "packages", ps4_react_package_api(ctx));
   JS_SetPropertyStr(ctx, api, "payloads", ps4_react_payload_api(ctx));
   JS_SetPropertyStr(ctx, api, "saveData", ps4_react_save_data_api(ctx));

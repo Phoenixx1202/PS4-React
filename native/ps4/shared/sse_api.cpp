@@ -225,8 +225,8 @@ JSValue connect(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (!url) return JS_EXCEPTION;
     std::string address(url, length);
     JS_FreeCString(ctx, url);
-    if (length > 2048 || address.rfind("http://", 0) != 0 &&
-        address.rfind("https://", 0) != 0)
+    if (length > 2048 ||
+        (address.rfind("http://", 0) != 0 && address.rfind("https://", 0) != 0))
         return JS_ThrowTypeError(ctx, "Sse.connect: URL must be http(s) and at most 2048 bytes");
 
     auto task = std::make_shared<Task>();

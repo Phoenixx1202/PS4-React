@@ -30,6 +30,7 @@ The default build produces a single installable package:
   use it are packaged with `"privileged": true` (`IV0000`/`gde`).
 - **Payload delivery** to GoldHEN's BinLoader with ELF and size checks.
 - **Server-Sent Events** through `Sse.connect` with bounded event queues.
+- **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
 - **Device information** (model, firmware, CPU frequency/temperature, SoC
   temperature, free flexible memory) and user enumeration.
 - **Save data** through `sceSaveData` and the system on-screen keyboard through
@@ -178,6 +179,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Packages.uninstall` | Remove a title through `sceAppInstUtil`; requires a privileged app |
 | `Payloads` | Check GoldHEN BinLoader and send an ELF payload to 127.0.0.1:9090 |
 | `Sse` | Server-Sent Events stream with event polling and cancellation |
+| `WebSocket` | ws/wss text client with polling, ping/pong and close |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Dialog` | System message dialogs (`alert`, `confirm` and `progress`) |

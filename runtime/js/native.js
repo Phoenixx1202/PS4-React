@@ -616,6 +616,31 @@ export const Sse = Object.freeze({
   },
 });
 
+/**
+ * WebSocket client. `connect` opens ws:// or wss:// through libcurl's
+ * connect-only mode, runs the upgrade handshake and frames text messages on a
+ * worker thread. `poll` returns `{state, error, events}`; binary messages are
+ * base64-encoded with `binary: true`.
+ */
+export const WebSocket = Object.freeze({
+  /** @param {string} url @returns {{id: number, send: (text: string) => boolean,
+   *   poll: () => {state: string, error: string, events: object[]}, close: () => void}} */
+  connect(url) {
+    if (typeof url !== 'string' || !/^wss?:\/\//i.test(url))
+      throw new TypeError('WebSocket.connect: URL must start with ws:// or wss://');
+    const id = host().websocket.connect(url);
+    return Object.freeze({
+      id,
+      send(text) {
+        if (typeof text !== 'string') throw new TypeError('WebSocket.send: expected a string');
+        return host().websocket.send(id, text);
+      },
+      poll: () => host().websocket.poll(id),
+      close: () => host().websocket.close(id),
+    });
+  },
+});
+
 const pendingImages = new Map();
 let stopImagePolling = null;
 

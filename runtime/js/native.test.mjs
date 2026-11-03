@@ -3,7 +3,7 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {acquireImage, Archives, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound, Sse} from './native.js';
+import {acquireImage, Archives, Dialog, Downloads, FileSystem, Http, Keyboard, Packages, Payloads, Power, SaveData, Sound, Sse, WebSocket} from './native.js';
 
 test('SaveData forwards mount, unmount and remove to the host', () => {
   assert.throws(() => SaveData.mount({dirName: 'slot1'}), /PS4 React host/);
@@ -381,6 +381,34 @@ test('Sse connects, polls events and closes', () => {
       ['close', 11],
     ]);
     assert.throws(() => Sse.connect({url: 'ftp://example.com'}), /http/);
+  } finally {
+    delete globalThis.__ps4ReactNative;
+  }
+});
+
+test('WebSocket connects, sends text and polls events', () => {
+  const calls = [];
+  globalThis.__ps4ReactNative = {websocket: {
+    connect: url => { calls.push(['connect', url]); return 12; },
+    send: (id, text) => { calls.push(['send', id, text]); return true; },
+    poll: id => { calls.push(['poll', id]); return {state: 'open', error: '', events: [
+      {type: 'open', data: '', binary: false}]}; },
+    close: id => { calls.push(['close', id]); },
+  }};
+  try {
+    const socket = WebSocket.connect('ws://192.168.0.8:8766/');
+    assert.equal(socket.id, 12);
+    assert.equal(socket.send('hello'), true);
+    assert.equal(socket.poll().events[0].type, 'open');
+    socket.close();
+    assert.deepEqual(calls, [
+      ['connect', 'ws://192.168.0.8:8766/'],
+      ['send', 12, 'hello'],
+      ['poll', 12],
+      ['close', 12],
+    ]);
+    assert.throws(() => WebSocket.connect('http://example.com'), /ws/);
+    assert.throws(() => socket.send(42), /string/);
   } finally {
     delete globalThis.__ps4ReactNative;
   }

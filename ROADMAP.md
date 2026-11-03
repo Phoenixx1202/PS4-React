@@ -153,7 +153,9 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.8 Rede avançada
 
-- [ ] WebSocket cliente (texto/binário, ping/pong, reconexão);
+- [ ] WebSocket cliente (texto/binário, ping/pong, reconexão): cliente
+  texto `ws://`/`wss://` e ping/pong implementados; binário de saída e
+  reconexão automática pendentes; validação de hardware pendente;
 - [x] SSE/streaming HTTP para respostas longas (cliente `Sse` validado com
   servidor local; fila limitada a 256 eventos);
 - [ ] limites de memória e backpressure (fila limitada implementada; falta
