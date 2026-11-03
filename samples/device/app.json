@@ -1,0 +1,16 @@
+{
+  "$schema": "../../app.schema.json",
+  "titleId": "CUSA99069",
+  "contentId": "UP0001-CUSA99069_00-PS4SAMPLEDEVICE1",
+  "name": "PS4 React Sample: Device",
+  "version": "01.000.000",
+  "render": {
+    "width": 2560,
+    "height": 1440
+  },
+  "surface": {
+    "width": 1920,
+    "height": 1080
+  },
+  "timeoutSeconds": 30
+}
