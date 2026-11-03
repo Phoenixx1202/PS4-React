@@ -45,18 +45,22 @@ function App() {
     return () => clearInterval(timer);
   }, [stream]);
 
-  const connect = () => {
+  const open = target => {
     setError('');
     setEvents([]);
     try {
       if (stream) stream.close();
-      const next = Sse.connect({url, headers: ['Accept: text/event-stream']});
+      const next = Sse.connect({url: target, headers: ['Accept: text/event-stream']});
+      setUrl(target);
       setStream(next);
       setState('connecting');
     } catch (reason) {
       setError(reason.message || String(reason));
     }
   };
+
+  const connect = () => open(url);
+  const local = () => open('http://192.168.0.8:8765/events');
 
   const close = () => {
     if (stream) stream.close();
@@ -103,6 +107,7 @@ function App() {
         </View>
         <View style={{flexDirection: 'row', gap: 18}}>
           <Button label="Connect" autoFocus onPress={connect} />
+          <Button label="Local test" onPress={local} />
           <Button label="Close" onPress={close} />
           <Button label="Change URL" onPress={edit} />
         </View>
