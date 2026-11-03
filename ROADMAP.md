@@ -160,7 +160,8 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.9 Arquivos compactados
 
-- [ ] `Archives.create` (ZIP/TAR) com entradas, progresso e cancelamento;
+- [ ] `Archives.create` (ZIP/TAR) com entradas, progresso e cancelamento
+  implementado; validação de hardware pendente;
 - [ ] validar TAR e 7z no hardware (ZIP já validado);
 - [ ] RAR5 não criptografado e RAR criptografado (ver 2.4);
 - [ ] testes de path traversal, symlink e limites.
