@@ -515,6 +515,24 @@ export const Archives = Object.freeze({
   inspect: sources => host().archives.inspect(sources),
   /** Whether `extract` takes `stream`. */
   streams: true,
+  /**
+   * Creates a ZIP or TAR from files and directories. Each source is stored
+   * under its basename; directories are walked recursively. `overwrite: true`
+   * replaces an existing destination.
+   * @param {{sources: string[], destination: string, format?: 'zip' | 'tar',
+   *   overwrite?: boolean}} options
+   * @returns {ReturnType<typeof networkTask>}
+   */
+  create({sources, destination, format = 'zip', overwrite = false}) {
+    if (!Array.isArray(sources) || sources.length === 0)
+      throw new TypeError('Archives.create: sources must be a non-empty array');
+    if (format !== 'zip' && format !== 'tar')
+      throw new TypeError("Archives.create: format must be 'zip' or 'tar'");
+    if (typeof overwrite !== 'boolean')
+      throw new TypeError('Archives.create: overwrite must be a boolean');
+    const id = host().archiveCreate.create(sources, destination, format, overwrite);
+    return networkTask(id, 'Archives.create', destination, 'archiveCreate');
+  },
 });
 
 /**

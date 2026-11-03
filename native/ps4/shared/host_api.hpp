@@ -209,6 +209,7 @@ void ps4_react_stop_sound();
 
 // ABI v5 additive archive tasks: extract(sources, destination, maxBytes, password?), inspect(sources), cancel(id), poll().
 JSValue ps4_react_archive_api(JSContext* ctx);
+JSValue ps4_react_archive_create_api(JSContext* ctx);
 // ABI v5 additive package installs: install(path, name), cancel(id), poll().
 JSValue ps4_react_package_api(JSContext* ctx);
 JSValue ps4_react_payload_api(JSContext* ctx);

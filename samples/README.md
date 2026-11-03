@@ -15,6 +15,7 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample settings
 .\tools\build_ps4.ps1 -Sample packages
 .\tools\build_ps4.ps1 -Sample payloads
+.\tools\build_ps4.ps1 -Sample archive
 ```
 
 On Linux:
@@ -51,6 +52,7 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `dialogs` | `Dialog.alert` and `Dialog.confirm` through the system message dialog |
 | `packages` | `Packages.install`/`Packages.uninstall` with progress and errors; the sample is packaged as a privileged app |
 | `payloads` | GoldHEN BinLoader availability and sending an ELF payload with confirmation |
+| `archive` | `Archives.create` ZIP, `Archives.extract` and `Archives.inspect` |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
 font sizes each app uses.

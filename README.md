@@ -165,6 +165,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Downloads.enqueue` | Download to a file with ranges, resume and completion receipts |
 | `<Image>` | Local baked assets and remote PNG/JPEG decoding |
 | `Archives.extract` | ZIP, TAR and 7z extraction with a destination directory |
+| `Archives.create` | Create ZIP or TAR archives from files and directories |
 | `Sound` | Play baked WAV clips with volume and pan |
 | `Notifications` / `Users` / `DeviceInfo` | Notifications, users and device information |
 | `FileSystem` | Read, write, list, rename and inspect files |

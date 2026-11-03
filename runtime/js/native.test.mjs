@@ -331,3 +331,33 @@ test('Dialog.progress updates and closes the system bar', async () => {
     delete globalThis.__ps4ReactNative;
   }
 });
+
+test('Archives.create runs through the archive-create backend', async () => {
+  let tick, snapshots = [];
+  const calls = [];
+  const originalInterval = globalThis.setInterval;
+  const originalClear = globalThis.clearInterval;
+  globalThis.setInterval = callback => { tick = callback; return 1; };
+  globalThis.clearInterval = () => {};
+  globalThis.__ps4ReactNative = {archiveCreate: {
+    create: (...args) => { calls.push(args); return 9; },
+    cancel: () => {},
+    poll: () => snapshots,
+  }};
+  try {
+    const task = Archives.create({sources: ['/app0/app.json'], destination: '/download0/out.zip'});
+    assert.equal(task.id, 9);
+    assert.deepEqual(calls, [[['/app0/app.json'], '/download0/out.zip', 'zip', false]]);
+    snapshots = [{id: 9, state: 'writing', written: 10, entries: 1, error: ''}];
+    tick();
+    assert.deepEqual([task.snapshot.state, task.snapshot.entries], ['writing', 1]);
+    snapshots = [{id: 9, state: 'completed', written: 20, entries: 1}];
+    tick();
+    assert.equal((await task.done).written, 20);
+    assert.throws(() => Archives.create({sources: [], destination: '/download0/out.zip'}), /non-empty/);
+    assert.throws(() => Archives.create({sources: ['/app0/app.json'], destination: '/download0/out.rar', format: 'rar'}), /zip.*tar/);
+  } finally {
+    globalThis.setInterval = originalInterval; globalThis.clearInterval = originalClear;
+    delete globalThis.__ps4ReactNative;
+  }
+});

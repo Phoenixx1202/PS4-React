@@ -1,0 +1,16 @@
+{
+  "$schema": "../../app.schema.json",
+  "titleId": "CUSA99068",
+  "contentId": "UP0001-CUSA99068_00-PS4SAMPLEARCHIVE",
+  "name": "PS4 React Sample: Archive",
+  "version": "01.000.000",
+  "render": {
+    "width": 2560,
+    "height": 1440
+  },
+  "surface": {
+    "width": 1920,
+    "height": 1080
+  },
+  "timeoutSeconds": 30
+}
