@@ -129,6 +129,26 @@ bool arrange_relaunch(char* error, std::size_t size) {
     return false;
 }
 
+void* kernel_sys_symbol(const char* name) {
+    OrbisKernelModule modules[256] = {};
+    std::size_t count = 0;
+    if (sceKernelGetModuleList(modules, 256, &count) != 0)
+        return nullptr;
+    for (std::size_t i = 0; i < count && i < 256; ++i) {
+        OrbisKernelModuleInfo info{};
+        info.size = sizeof info;
+        if (sceKernelGetModuleInfo(modules[i], &info) != 0)
+            continue;
+        if (!std::strstr(info.name, "libkernel_sys"))
+            continue;
+        void* address = nullptr;
+        if (sceKernelDlsym(static_cast<std::int32_t>(modules[i]), name, &address) == 0)
+            return address;
+        break;
+    }
+    return nullptr;
+}
+
 void device_info(DeviceInfo& info) {
     std::snprintf(info.model, sizeof info.model, "PS4");
     OrbisKernelSwVersion version{};
@@ -144,6 +164,28 @@ void device_info(DeviceInfo& info) {
     size_t bytes = 0;
     if (available && available(&bytes) == 0)
         info.free_memory = static_cast<std::int64_t>(bytes);
+
+    // The temperature entry points live in libkernel_sys, which the loader
+    // already maps into the process but does not link into the app.
+    using CpuTemperatureFn = int (*)(int*);
+    using SocTemperatureFn = int (*)(int, int*);
+    void* cpu_symbol = kernel_sys_symbol("sceKernelGetCpuTemperature");
+    void* soc_symbol = kernel_sys_symbol("sceKernelGetSocSensorTemperature");
+    if (!cpu_symbol || !soc_symbol)
+        ps4::system::log("device: temperature symbols cpu=%p soc=%p", cpu_symbol, soc_symbol);
+    if (cpu_symbol) {
+        int value = 0;
+        const int result = reinterpret_cast<CpuTemperatureFn>(cpu_symbol)(&value);
+        if (result == 0) info.cpu_temperature = value;
+        else ps4::system::log("device: CpuTemperature=0x%08x", static_cast<unsigned>(result));
+    }
+    if (soc_symbol) {
+        int value = 0;
+        const int result = reinterpret_cast<SocTemperatureFn>(soc_symbol)(0, &value);
+        if (result == 0) info.soc_temperature = value;
+        else ps4::system::log("device: SocSensorTemperature=0x%08x", static_cast<unsigned>(result));
+    }
+
     info.process_time = static_cast<std::int64_t>(sceKernelGetProcessTime());
     std::snprintf(info.language, sizeof info.language, "en-US");
 }
