@@ -28,9 +28,10 @@ function App() {
 
   const check = () => {
     setError('');
-    const available = Payloads.isAvailable();
-    setStatus(available ? 'BinLoader is reachable.' : 'BinLoader is not available.');
-    setDetail(available ? '127.0.0.1:9090 accepts a connection.' : 'Enable BinLoader in GoldHEN and try again.');
+    const info = Payloads.diagnose();
+    setStatus(info.available ? 'BinLoader is reachable.' : 'BinLoader is not available.');
+    setDetail(`loopback: ${info.loopback ? 'ok' : `error ${info.loopbackError}`}  |  `
+      + `${info.ip || '?'}:${info.port}: ${info.lan ? 'ok' : `error ${info.lanError}`}`);
   };
 
   const send = async () => {

@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <orbis/NetCtl.h>
 #include <pthread.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -84,19 +85,19 @@ bool resolve(JSContext* ctx, JSValueConst value, std::string& out) {
     return ok;
 }
 
-int connect_binloader(int timeout_ms) {
+int connect_address(std::uint32_t address, int timeout_ms) {
     const int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
 
     const int flags = fcntl(fd, F_GETFL, 0);
     if (flags >= 0) fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_port = htons(kPort);
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    sockaddr_in destination{};
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(kPort);
+    destination.sin_addr.s_addr = address;
 
-    int result = connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof address);
+    int result = connect(fd, reinterpret_cast<sockaddr*>(&destination), sizeof destination);
     if (result != 0 && errno == EINPROGRESS) {
         fd_set writes;
         FD_ZERO(&writes);
@@ -128,6 +129,52 @@ int connect_binloader(int timeout_ms) {
     timeval send_timeout{5, 0};
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof send_timeout);
     return fd;
+}
+
+std::uint32_t local_address() {
+    OrbisNetCtlInfo info{};
+    if (sceNetCtlGetInfo(ORBIS_NET_CTL_INFO_IP_ADDRESS, &info) != 0)
+        return 0;
+    struct in_addr address {};
+    if (inet_pton(AF_INET, info.ip_address, &address) != 1)
+        return 0;
+    return address.s_addr;
+}
+
+struct Probe {
+    bool loopback = false;
+    bool lan = false;
+    int loopback_error = 0;
+    int lan_error = 0;
+    std::string ip;
+};
+
+Probe probe_binloader(int timeout_ms) {
+    Probe probe;
+    const int loopback = connect_address(htonl(INADDR_LOOPBACK), timeout_ms);
+    if (loopback >= 0) {
+        probe.loopback = true;
+        close(loopback);
+    } else {
+        probe.loopback_error = errno;
+    }
+
+    OrbisNetCtlInfo info{};
+    if (sceNetCtlGetInfo(ORBIS_NET_CTL_INFO_IP_ADDRESS, &info) == 0)
+        probe.ip = info.ip_address;
+    const std::uint32_t address = local_address();
+    if (address) {
+        const int lan = connect_address(address, timeout_ms);
+        if (lan >= 0) {
+            probe.lan = true;
+            close(lan);
+        } else {
+            probe.lan_error = errno;
+        }
+    } else {
+        probe.lan_error = ENETUNREACH;
+    }
+    return probe;
 }
 
 bool send_all(int fd, const char* data, std::size_t size) {
@@ -172,13 +219,20 @@ void run(Task& task) {
         return;
     }
 
-    const int socket = connect_binloader(3000);
+    const int socket = connect_address(htonl(INADDR_LOOPBACK), 3000);
     if (socket < 0) {
-        close(fd);
-        fail(task, "BinLoader is not reachable at 127.0.0.1:9090", errno);
-        return;
+        const std::uint32_t address = local_address();
+        const int probe_lan = address ? connect_address(address, 3000) : -1;
+        if (probe_lan < 0) {
+            close(fd);
+            fail(task, "BinLoader is not reachable at 127.0.0.1:9090", errno);
+            return;
+        }
+        task.socket = probe_lan;
+    } else {
+        task.socket = socket;
     }
-    task.socket = socket;
+    const int connection = task.socket;
     task.state = State::sending;
     ps4::system::log("payloads: sending %s (%llu bytes)", task.path.c_str(),
                      static_cast<unsigned long long>(task.total));
@@ -194,7 +248,7 @@ void run(Task& task) {
             break;
         }
         if (read_size == 0) break;
-        if (!send_all(socket, buffer, static_cast<std::size_t>(read_size))) {
+        if (!send_all(connection, buffer, static_cast<std::size_t>(read_size))) {
             fail(task, "cannot send the payload", errno);
             ok = false;
             break;
@@ -203,8 +257,8 @@ void run(Task& task) {
     }
 
     close(fd);
-    shutdown(socket, SHUT_WR);
-    close(socket);
+    shutdown(connection, SHUT_WR);
+    close(connection);
     task.socket = -1;
 
     if (ok && !task.cancelled) {
@@ -241,10 +295,29 @@ void start(const std::shared_ptr<Task>& task) {
 }
 
 JSValue available(JSContext* ctx, JSValueConst, int, JSValueConst*) {
-    const int socket = connect_binloader(500);
-    if (socket < 0) return JS_FALSE;
-    close(socket);
-    return JS_TRUE;
+    const Probe probe = probe_binloader(500);
+    ps4::system::log("payloads: probe loopback=0x%08x lan=%s=0x%08x",
+                     static_cast<unsigned>(probe.loopback_error),
+                     probe.ip.empty() ? "?" : probe.ip.c_str(),
+                     static_cast<unsigned>(probe.lan_error));
+    return JS_NewBool(ctx, probe.loopback || probe.lan);
+}
+
+JSValue diagnose(JSContext* ctx, JSValueConst, int, JSValueConst*) {
+    const Probe probe = probe_binloader(500);
+    ps4::system::log("payloads: probe loopback=0x%08x lan=%s=0x%08x",
+                     static_cast<unsigned>(probe.loopback_error),
+                     probe.ip.empty() ? "?" : probe.ip.c_str(),
+                     static_cast<unsigned>(probe.lan_error));
+    JSValue out = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, out, "available", JS_NewBool(ctx, probe.loopback || probe.lan));
+    JS_SetPropertyStr(ctx, out, "loopback", JS_NewBool(ctx, probe.loopback));
+    JS_SetPropertyStr(ctx, out, "lan", JS_NewBool(ctx, probe.lan));
+    JS_SetPropertyStr(ctx, out, "ip", JS_NewString(ctx, probe.ip.c_str()));
+    JS_SetPropertyStr(ctx, out, "port", JS_NewInt32(ctx, kPort));
+    JS_SetPropertyStr(ctx, out, "loopbackError", JS_NewInt32(ctx, probe.loopback_error));
+    JS_SetPropertyStr(ctx, out, "lanError", JS_NewInt32(ctx, probe.lan_error));
+    return out;
 }
 
 JSValue send_payload(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
@@ -308,6 +381,7 @@ JSValue poll(JSContext* ctx, JSValueConst, int, JSValueConst*) {
 JSValue ps4_react_payload_api(JSContext* ctx) {
     JSValue api = JS_NewObject(ctx);
     JS_SetPropertyStr(ctx, api, "isAvailable", JS_NewCFunction(ctx, available, "isAvailable", 0));
+    JS_SetPropertyStr(ctx, api, "diagnose", JS_NewCFunction(ctx, diagnose, "diagnose", 0));
     JS_SetPropertyStr(ctx, api, "send", JS_NewCFunction(ctx, send_payload, "send", 1));
     JS_SetPropertyStr(ctx, api, "cancel", JS_NewCFunction(ctx, cancel, "cancel", 1));
     JS_SetPropertyStr(ctx, api, "poll", JS_NewCFunction(ctx, poll, "poll", 0));
