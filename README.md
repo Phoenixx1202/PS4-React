@@ -162,7 +162,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `FileSystem` | Read, write, list, rename and inspect files |
 | `Controller` / `useGamepad` | Light bar, vibration and pad state |
 | `Packages.install` | Install a PKG through `sceAppInstUtil` |
-| `SaveData` | Mount, unmount and delete PS4 save data |
+| `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
@@ -174,7 +174,7 @@ Save data and the system keyboard are available from the same import:
 ```jsx
 import {SaveData, Keyboard, FileSystem} from '@ps4-react/core';
 
-const save = SaveData.mount({dirName: 'settings', title: 'My App'});
+const save = SaveData.mount({dirName: 'settings', title: 'My App', repairBroken: true});
 FileSystem.writeFile(`${save.path}/settings.json`, '{"name":"Player"}', {sync: true});
 
 const result = await Keyboard.prompt({title: 'Player name', value: 'Player'}).done;

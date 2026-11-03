@@ -107,13 +107,14 @@ export const Notifications = {
 export const SaveData = {
   /**
    * @param {{dirName?: string, blocks?: number, title?: string, subtitle?: string,
-   *   details?: string}} [options]
+   *   details?: string, repairBroken?: boolean}} [options]
    * @returns {{path: string}}
    */
-  mount({dirName = 'save', blocks = 96, title = '', subtitle = '', details = ''} = {}) {
+  mount({dirName = 'save', blocks = 96, title = '', subtitle = '', details = '',
+      repairBroken = false} = {}) {
     const backend = host().saveData;
     if (typeof backend?.mount !== 'function') throw new Error('SaveData is not available on this host');
-    return Object.freeze(backend.mount(dirName, blocks, title, subtitle, details));
+    return Object.freeze(backend.mount(dirName, blocks, title, subtitle, details, Boolean(repairBroken)));
   },
   /** Unmount one directory, or every mounted directory when omitted. @param {string} [dirName] */
   unmount(dirName = '') {

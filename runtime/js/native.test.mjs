@@ -18,7 +18,7 @@ test('SaveData forwards mount, unmount and remove to the host', () => {
   try {
     assert.deepEqual(SaveData.mount({dirName: 'slot1', blocks: 128, title: 'Save'}),
       {path: '/savedata0'});
-    assert.deepEqual(calls, [['slot1', 128, 'Save', '', '']]);
+    assert.deepEqual(calls, [['slot1', 128, 'Save', '', '', false]]);
     assert.equal(SaveData.unmount('slot1'), true);
     assert.equal(SaveData.remove('slot1'), true);
     assert.deepEqual(calls.slice(1), [['unmount', 'slot1'], ['remove', 'slot1']]);

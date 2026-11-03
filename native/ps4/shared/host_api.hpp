@@ -59,7 +59,8 @@
 //                                  sceAppInstUtil
 //   packages.cancel(id)            stops reporting; an install the console accepted carries on
 //   packages.poll()                state/error/titleId/status/written/total; consumes terminal results
-//   saveData.mount(dir, blocks, title, subtitle, details) -> {path}; synchronous mount
+//   saveData.mount(dir, blocks, title, subtitle, details, repairBroken) -> {path}; synchronous mount
+//                                  repairBroken deletes and recreates a directory marked broken
 //   saveData.unmount(dir?)         unmounts one directory, or every mounted directory
 //   saveData.remove(dir)           unmounts the directory and deletes its save data
 //   network.version()              transport version string

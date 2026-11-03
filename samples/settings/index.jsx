@@ -28,7 +28,9 @@ function App() {
   useEffect(() => {
     let mounted = true;
     try {
-      const save = SaveData.mount({dirName: DIR, blocks: 96, title: 'PS4 React Settings'});
+      const save = SaveData.mount({
+        dirName: DIR, blocks: 96, title: 'PS4 React Settings', repairBroken: true,
+      });
       const file = `${save.path}/${FILE}`;
       let name = 'Player';
       if (FileSystem.exists(file)) {

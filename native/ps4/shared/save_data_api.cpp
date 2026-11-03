@@ -39,8 +39,35 @@ bool user_id(int& id) {
     return true;
 }
 
+constexpr int kBroken = static_cast<int>(0x809f000fu);
+
+const char* error_name(int code) {
+    switch (static_cast<unsigned>(code)) {
+        case 0x809f0001u: return "not initialized";
+        case 0x809f0007u: return "already exists";
+        case 0x809f000au: return "no space";
+        case 0x809f000du: return "bad mount";
+        case 0x809f000fu: return "broken save data";
+        case 0x809f0011u: return "invalid login user";
+        default: return "save data error";
+    }
+}
+
+int delete_save(int user, const std::string& directory) {
+    OrbisSaveDataTitleId title{};
+    std::snprintf(title.data, sizeof title.data, "%s", PS4_REACT_TITLE_ID);
+    OrbisSaveDataDirName name{};
+    std::snprintf(name.data, sizeof name.data, "%s", directory.c_str());
+    OrbisSaveDataDelete request{};
+    request.userId = user;
+    request.titleId = &title;
+    request.dirName = &name;
+    return sceSaveDataDelete(&request);
+}
+
 JSValue failure(JSContext* ctx, const char* call, int code) {
-    return JS_ThrowPlainError(ctx, "%s failed (0x%08x)", call, static_cast<unsigned>(code));
+    return JS_ThrowPlainError(ctx, "%s failed: %s (0x%08x)", call, error_name(code),
+                              static_cast<unsigned>(code));
 }
 
 JSValue mount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
@@ -92,6 +119,7 @@ JSValue mount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     };
     if (!string_arg(2, title) || !string_arg(3, subtitle) || !string_arg(4, details))
         return JS_ThrowTypeError(ctx, "SaveData.mount: title, subtitle and details must be strings");
+    const bool repair = argc > 5 && JS_ToBool(ctx, argv[5]) == 1;
 
     ps4::system::log("saveData.mount: initializing for user=%d dir=%s blocks=%u",
                      user, directory.c_str(), static_cast<unsigned>(blocks));
@@ -109,9 +137,29 @@ JSValue mount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
                        ORBIS_SAVE_DATA_MOUNT_MODE_RDWR |
                        ORBIS_SAVE_DATA_MOUNT_MODE_COPY_ICON;
     OrbisSaveDataMountResult result{};
-    const int code = sceSaveDataMount2(&request, &result);
+    int code = sceSaveDataMount2(&request, &result);
     ps4::system::log("saveData.mount: sceSaveDataMount2=0x%08x path=%s",
                      static_cast<unsigned>(code), result.mountPathName);
+    if (code == kBroken && repair) {
+        ps4::system::log("saveData.mount: broken directory; deleting and recreating");
+        const int deleted = delete_save(user, directory);
+        ps4::system::log("saveData.mount: sceSaveDataDelete=0x%08x",
+                         static_cast<unsigned>(deleted));
+        if (deleted == 0) {
+            result = {};
+            code = sceSaveDataMount2(&request, &result);
+            ps4::system::log("saveData.mount: retry=0x%08x path=%s",
+                             static_cast<unsigned>(code), result.mountPathName);
+        } else {
+            // Deletion can fail if the system already considers the directory
+            // unusable. The explicit repair path may clear the corrupt flag.
+            request.mountMode |= ORBIS_SAVE_DATA_MOUNT_MODE_DESTRUCT_OFF;
+            result = {};
+            code = sceSaveDataMount2(&request, &result);
+            ps4::system::log("saveData.mount: destruct-off retry=0x%08x path=%s",
+                             static_cast<unsigned>(code), result.mountPathName);
+        }
+    }
     if (code != 0)
         return failure(ctx, "SaveData.mount", code);
 
@@ -195,15 +243,7 @@ JSValue remove(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
         }
     }
 
-    OrbisSaveDataTitleId title{};
-    std::snprintf(title.data, sizeof title.data, "%s", PS4_REACT_TITLE_ID);
-    OrbisSaveDataDirName name{};
-    std::snprintf(name.data, sizeof name.data, "%s", directory.c_str());
-    OrbisSaveDataDelete request{};
-    request.userId = user;
-    request.titleId = &title;
-    request.dirName = &name;
-    const int code = sceSaveDataDelete(&request);
+    const int code = delete_save(user, directory);
     if (code != 0)
         return failure(ctx, "SaveData.remove", code);
     return JS_TRUE;
