@@ -1,5 +1,7 @@
 #include "system.hpp"
 
+#include <cstddef>
+
 #include <orbis/CommonDialog.h>
 #include <orbis/Sysmodule.h>
 #include <orbis/SystemService.h>
@@ -111,9 +113,11 @@ bool initialize_services() {
     const int user = sceUserServiceInitialize(&parameters);
     log("service: user init=0x%08x", static_cast<unsigned>(user));
 
-    // IME is a public system module, unlike the internal SaveData and
-    // CommonDialog modules above. The common dialog must be initialized
-    // before sceImeDialogInit.
+    // IME and message dialogs are public system modules, unlike the internal
+    // SaveData and CommonDialog modules above. The common dialog must be
+    // initialized before sceImeDialogInit.
+    const int message = sceSysmoduleLoadModule(ORBIS_SYSMODULE_MESSAGE_DIALOG);
+    log("service: message_dialog=0x%08x", static_cast<unsigned>(message));
     const int ime = sceSysmoduleLoadModule(ORBIS_SYSMODULE_IME_DIALOG);
     log("service: ime_dialog=0x%08x", static_cast<unsigned>(ime));
     const int common = sceCommonDialogInitialize();
