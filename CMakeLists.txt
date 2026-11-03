@@ -55,6 +55,21 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/prepare_ps4_linker.py" "${OPENORBIS}/link.x")
 message(STATUS "PS4 linker: ${PS4_PROJECT_LINKER}")
 
+# OpenOrbis' crt1.o carries the local sceLibcHeapSize the loader reads. Its -1
+# default gives a ~12.7 MiB heap, which only works for mini apps that inherit
+# the shell heap. tools/build_ci.sh passes a copy patched to 512 MiB; use it in
+# the executable link templates instead of the toolchain copy.
+if(PS4_REACT_CRT1)
+    if(NOT EXISTS "${PS4_REACT_CRT1}")
+        message(FATAL_ERROR "PS4_REACT_CRT1 does not exist: ${PS4_REACT_CRT1}")
+    endif()
+    foreach(PS4_LANG C CXX)
+        string(REPLACE "${OPENORBIS}/lib/crt1.o" "${PS4_REACT_CRT1}"
+               CMAKE_${PS4_LANG}_LINK_EXECUTABLE "${CMAKE_${PS4_LANG}_LINK_EXECUTABLE}")
+    endforeach()
+    message(STATUS "PS4 crt1: ${PS4_REACT_CRT1}")
+endif()
+
 if(NOT PS4_REACT_GENERATED_DIR)
     set(PS4_REACT_GENERATED_DIR "${CMAKE_SOURCE_DIR}/.build/react")
 endif()

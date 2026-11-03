@@ -23,9 +23,13 @@ unset CFLAGS CXXFLAGS CPPFLAGS
 
 # OpenOrbis' crt1.o requests the "default" libc heap (-1), which is only about
 # 12.7 MiB on hardware. A mini app inherits the shell heap; a big app gets its
-# own and the first allocation can fault inside libSceLibcInternal. Rewrite the
-# local sceLibcHeapSize in crt1.o so every package gets a real heap.
-python3 "$ROOT/tools/patch_crt1.py" "$OPENORBIS/lib/crt1.o" --heap-mib 512
+# own and the first allocation can fault inside libSceLibcInternal. Patch a
+# project-local copy and point the linker at it, without writing to the
+# toolchain install (read-only on CI runners).
+CRT1="$ROOT/.build/crt1.o"
+mkdir -p "$ROOT/.build"
+cp "$OPENORBIS/lib/crt1.o" "$CRT1"
+python3 "$ROOT/tools/patch_crt1.py" "$CRT1" --heap-mib 512
 
 SAMPLE=""
 NO_PACKAGE=0
@@ -192,6 +196,7 @@ cmake -S "$ROOT" -B "$BUILD" \
     -DQUICKJS_ROOT="$QUICKJS" \
     -DHARFBUZZ_SRC="$HB_SRC/src" -DHARFBUZZ_LIB_DIR="$HB_BUILD" \
     -DPS4_REACT_GENERATED_DIR="$GEN" \
+    -DPS4_REACT_CRT1="$CRT1" \
     -DPS4_REACT_DEV_SERVER="$([ "$DEV_SERVER" = "1" ] && echo ON || echo OFF)"
 cmake --build "$BUILD" --target ps4_react_starter_stage --parallel "$(nproc)"
 
