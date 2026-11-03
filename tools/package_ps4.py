@@ -131,7 +131,7 @@ def main() -> int:
 
     strings = {
         "APP_VER": (version, 8),
-        "CATEGORY": ("gde", 4),
+        "CATEGORY": ("gd", 4),
         "FORMAT": ("obs", 4),
         "CONTENT_ID": (content_id, 48),
         "TITLE": (args.title, 128),
@@ -143,7 +143,7 @@ def main() -> int:
             "--maxsize", size, "--value", value, env=env)
     for key, value in {
         "APP_TYPE": 1,
-        "ATTRIBUTE": 32,
+        "ATTRIBUTE": 0,
         "DOWNLOAD_DATA_SIZE": 0,
         "SYSTEM_VER": 0,
     }.items():

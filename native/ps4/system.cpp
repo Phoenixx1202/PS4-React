@@ -150,11 +150,11 @@ void exit_app() {
     log("system: requesting title closure");
     std::fflush(nullptr);
 
-    // Ask the system to close the title. This is rejected on the firmware used
-    // here (0x80a10005), and sceSystemServiceKillApp leaves the caller parked
-    // behind the launch splash instead of ending it. The reliable path is to
-    // leave the loop and terminate this process; the shell then reclaims the
-    // display once the process is gone.
+    // Ask the system to close the title. This is refused when the package is
+    // registered as a mini app (0x80a10005); a big app gets closed asynchronously
+    // by the shell. If the request is refused, go home instead of calling
+    // _exit(): the app sandbox turns that into SIGSYS and the system reports a
+    // crash over a clean close.
     const int result = sceSystemServiceLoadExec("exit", nullptr);
     log("system: LoadExec(exit)=0x%08x", static_cast<unsigned>(result));
     if (result == 0) {
@@ -162,8 +162,9 @@ void exit_app() {
         park();
     }
 
-    log("system: terminating process");
-    _exit(0);
+    sceSystemServiceNavigateToGoHome();
+    log("system: NavigateToGoHome requested");
+    park();
 }
 
 } // namespace ps4::system
