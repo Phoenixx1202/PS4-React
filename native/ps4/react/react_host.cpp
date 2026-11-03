@@ -200,13 +200,18 @@ int main() {
     }
     ps4::system::log("PS4 React Starter: runtime init, gc_accounting=%d",
                 er_runtime_gc_accounting_ok() ? 1 : 0);
+    ps4::system::log("PS4 React Starter: registering baked assets");
     er_register_assets();
+    ps4::system::log("PS4 React Starter: baked assets registered");
 
     char font_dir[512] = {};
-    if (host::resolve_path("/app0/fonts", font_dir, sizeof font_dir))
+    if (host::resolve_path("/app0/fonts", font_dir, sizeof font_dir)) {
+        ps4::system::log("PS4 React Starter: installing text shaper from %s", font_dir);
         text_shaper::install(font_dir, react_log);
-    else
+        ps4::system::log("PS4 React Starter: text shaper ready");
+    } else {
         ps4::system::log("PS4 React Starter: font directory not resolved");
+    }
 
     // Keep the last error on screen instead of exiting to a black screen. The
     // overlay is precompiled Embedded React bytecode and works after a failed
@@ -223,6 +228,8 @@ int main() {
         ps4::system::park();
     };
 
+    ps4::system::log("PS4 React Starter: evaluating bundle (%lu bytes)",
+                     app_bundle_length);
     const bool loaded = er_runtime_load_source(app_bundle, app_bundle_length, "app.bundle.js");
     ps4::system::log("PS4 React Starter: bundle=%d error=%s", loaded ? 1 : 0,
                 er_runtime_last_error());

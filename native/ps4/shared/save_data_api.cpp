@@ -4,6 +4,7 @@
 #include "host_api.hpp"
 
 #include "app_config.generated.h"
+#include "system.hpp"
 
 #include <orbis/SaveData.h>
 
@@ -92,18 +93,25 @@ JSValue mount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (!string_arg(2, title) || !string_arg(3, subtitle) || !string_arg(4, details))
         return JS_ThrowTypeError(ctx, "SaveData.mount: title, subtitle and details must be strings");
 
+    ps4::system::log("saveData.mount: initializing for user=%d dir=%s blocks=%u",
+                     user, directory.c_str(), static_cast<unsigned>(blocks));
     if (!initialize())
         return JS_ThrowPlainError(ctx, "SaveData.mount: sceSaveDataInitialize3 failed");
+    ps4::system::log("saveData.mount: initialize ok");
 
-    OrbisSaveDataMount request{};
+    OrbisSaveDataDirName dir_name{};
+    std::snprintf(dir_name.data, sizeof dir_name.data, "%s", directory.c_str());
+    OrbisSaveDataMount2 request{};
     request.userId = user;
-    request.titleId = PS4_REACT_TITLE_ID;
-    request.dirName = directory.c_str();
-    request.fingerprint = "";
+    request.dirName = &dir_name;
     request.blocks = blocks;
-    request.mountMode = ORBIS_SAVE_DATA_MOUNT_MODE_CREATE2 | ORBIS_SAVE_DATA_MOUNT_MODE_RDWR;
+    request.mountMode = ORBIS_SAVE_DATA_MOUNT_MODE_CREATE2 |
+                       ORBIS_SAVE_DATA_MOUNT_MODE_RDWR |
+                       ORBIS_SAVE_DATA_MOUNT_MODE_COPY_ICON;
     OrbisSaveDataMountResult result{};
-    const int code = sceSaveDataMount(&request, &result);
+    const int code = sceSaveDataMount2(&request, &result);
+    ps4::system::log("saveData.mount: sceSaveDataMount2=0x%08x path=%s",
+                     static_cast<unsigned>(code), result.mountPathName);
     if (code != 0)
         return failure(ctx, "SaveData.mount", code);
 
