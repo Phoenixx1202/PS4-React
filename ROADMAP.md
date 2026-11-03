@@ -146,12 +146,12 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.7 Multi-controle e multi-usuário
 
-- [ ] enumerar usuários e abrir um pad por usuário (implementado; um pad por
-  usuário logado, até 4);
-- [ ] `Controller`/`useGamepad(playerIndex)` e troca de jogador (implementado;
-  validação pendente);
+- [x] enumerar usuários e abrir um pad por usuário (validado com um usuário;
+  até 4 pads);
+- [x] `Controller`/`useGamepad(playerIndex)` e troca de jogador (validado);
 - [ ] eventos de login/logout;
-- [ ] teste com dois controles (sample controllers criado).
+- [ ] teste com dois controles (sample controllers criado; falta um segundo
+  controle).
 
 ### 1.8 Rede avançada
 
@@ -428,6 +428,11 @@ firmware/GoldHEN:
   `music: /data/pkg/music.mp3 44100 Hz 2 ch, 16436736 frames`, play/pause/
   resume/stop/volume funcionaram. Commit local `59346e9`. OGG/Opus, HTTP,
   seek, playlists/crossfade e metadados pendentes.
+- 2026-11-03 - multi-controle validado no hardware (sample controllers, PKG
+  `2c80a206ce4ad8dfdbcaa3fb8f5f922d62635a1ddb2706c35c7d5f2799156862`):
+  `PS4 React Starter: pads=1 users=1`, Player 1 conectado e estados por
+  jogador via `Controller.getState`/`useGamepad(playerIndex)`. Commit local
+  `5f728af`. Falta o teste com dois controles e eventos de login/logout.
 ```
 
 ## Changelog do plano
