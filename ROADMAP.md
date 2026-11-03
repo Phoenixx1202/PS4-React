@@ -174,9 +174,8 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.11 Samples que faltam
 
-- [ ] `audio` (Sound.play) — sample com WAV empacotado implementado; teste de
-  hardware pendente;
-- [ ] `downloads` (progresso/cancelar/retomar)
+- [x] `audio` (Sound.play) — sample com WAV empacotado validado;
+- [x] `downloads` (progresso/cancelar/retomar) — sample validado;
 - [x] `archive` (extrair/criar) — ZIP criar/inspecionar/extrair validado;
 - [ ] `text` (CJK/árabe/Indic)
 - [x] `device` (DeviceInfo/Users/Notifications) — validado, incluindo
@@ -401,6 +400,11 @@ firmware/GoldHEN:
   temperaturas de CPU/SoC via `sceKernelGetCpuTemperature`/
   `sceKernelGetSocSensorTemperature` resolvidas de `libkernel_sys` com
   `sceKernelDlsym`. Commit local `41efc60`.
+- 2026-11-03 - samples audio e downloads validados no hardware: WAV empacotado
+  (`sound=yes`, beep/pan/volume) e download de 10 MB com progresso/cancelar/
+  retry. PKGs `26fdb4bf265c3093421bc3cd4dfdc22dd3b8c596ac26ee2f85d74f4453b5bd0a`
+  e `6c60a439a73f204c121ac944ec95dec60eafce08f5fa3a42b3b097f79e62348f`;
+  commits locais `b3087c5` e `0c69890`.
 ```
 
 ## Changelog do plano
