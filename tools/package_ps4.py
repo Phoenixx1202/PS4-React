@@ -108,7 +108,7 @@ def main() -> int:
             shutil.copytree(item, target)
         elif item.is_file():
             shutil.copy2(item, target)
-    for name in ("icon0.png", "pic0.png", "pic1.png"):
+    for name in ("icon0.png", "pic0.png", "pic1.png", "save_data.png"):
         source = Path(args.assets) / name
         if source.is_file():
             shutil.copy2(source, stage / "sce_sys" / name)

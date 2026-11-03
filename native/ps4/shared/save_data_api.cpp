@@ -108,6 +108,9 @@ JSValue mount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
             JS_SetPropertyStr(ctx, out, "path", JS_NewString(ctx, existing->second.path.c_str()));
             return out;
         }
+        if (mounted.size() >= 8)
+            return JS_ThrowPlainError(ctx,
+                "SaveData.mount: 8 directories are already mounted; unmount one first");
     }
 
     std::string title;

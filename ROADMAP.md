@@ -113,13 +113,16 @@ app.db. Validado no hardware; PKG grande e inválido pendentes.
 
 ### 1.4 Relaunch
 
-- [ ] implementar `BackHandler.exitApp({relaunch: true})`;
-- [ ] definir mecanismo: `sceLncUtilLaunchApp` antes do kill, ou helper local
-  que aguarda o processo terminar e relança;
-- [ ] evitar corrida com o `KillApp` e com o app.db;
-- [ ] teste de hardware.
+- [x] implementar `BackHandler.exitApp({relaunch: true})`;
+- [x] mecanismo: `sceSystemServiceLoadExec("/app0/eboot.bin", nullptr)`; o
+  `sceLncUtilLaunchApp` não é exportado no processo e o import direto crasha
+  (trap do GoldHEN);
+- [x] evitar corrida com o `KillApp`: o `LoadExec` substitui o processo
+  (`Syscore App: Kill for LoadExec` seguido de novo `EXEC /app0/eboot.bin`);
+- [x] teste de hardware.
 
 **Aceite:** fecha e reabre o mesmo título sem passar pelo dashboard manual.
+Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 1.5 Save data: polimento
 
@@ -358,6 +361,12 @@ firmware/GoldHEN:
   counter `35e2029a403843994edc8c5cbfeb383f8341deba1a758f964a534477ff7adbcd`.
   Log: `packages: installed CUSA99060 from /data/pkg/PS4-React-counter.pkg`
   e `packages: uninstalled CUSA99060`. Commit local `783c23a`, sem push.
+- 2026-11-03 - relaunch validado no hardware (sample packages): o app fecha e
+  reabre pelo `sceSystemServiceLoadExec("/app0/eboot.bin")`; KLog mostra
+  `Kill for LoadExec` e um novo `EXEC /app0/eboot.bin`, e o `react.log` recomeça
+  do zero. `sceLncUtilLaunchApp` não é exportado no processo e o import direto
+  crasha. PKG `8210a1ce35ba4b3abf9f13dd94e69bb7db53927ed9ddbb70eac5288d74e6067b`;
+  commit local `eb13b35`, sem push.
 ```
 
 ## Changelog do plano

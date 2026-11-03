@@ -80,8 +80,8 @@
 //   text.setLanguage(tag)          ABI v6; BCP 47 language for runtime text (Han glyph forms,
 //                                  shaping); defaults to the system language
 //   exit(relaunch)                 asks the host to close after this frame; with relaunch true it
-//                                  queues the title through sceLncUtilLaunchApp and returns true, or
-//                                  the reason it cannot
+//                                  re-execs the app through sceSystemServiceLoadExec and returns
+//                                  true, or the reason it cannot
 // Failures throw a JS Error whose message names the call, the path, and strerror.
 #pragma once
 

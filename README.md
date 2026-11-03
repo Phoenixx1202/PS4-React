@@ -236,7 +236,9 @@ Validated on PS4 hardware:
 - system message dialogs (`Dialog.alert`/`Dialog.confirm`) with Cross confirm
   and input suppression while a dialog or the keyboard is open;
 - background/active lifecycle with save-data unmount/remount across the PS
-  button and resume.
+  button and resume;
+- app relaunch through `BackHandler.exitApp({relaunch: true})` with
+  `sceSystemServiceLoadExec`.
 
 Known limitations:
 
