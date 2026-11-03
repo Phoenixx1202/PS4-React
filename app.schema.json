@@ -58,6 +58,11 @@
       "type": "boolean",
       "description": "Package with the system auth id used by installer apps. Required by Packages.install/uninstall; the PKG is built as category gde with ATTRIBUTE 32.",
       "default": false
+    },
+    "gpu": {
+      "type": "boolean",
+      "description": "Present through Piglet/OpenGL ES instead of the software VideoOut path; falls back to software if Piglet cannot start.",
+      "default": false
     }
   },
   "additionalProperties": true,

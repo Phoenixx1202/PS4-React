@@ -268,10 +268,11 @@ silenciosa. Validado no hardware; a auditoria formal fica pendente.
 ### 4.1 Backend GPU
 
 - [ ] spike de backend: OpenGL ES/Piglet versus GNM (PS4);
-- [ ] abstração `Renderer` com implementação software e GPU;
+- [x] abstração `Renderer` com implementação software e apresentação GPU
+  (Piglet/EGL) opt-in por `"gpu": true`, com fallback software;
 - [ ] atlas de textura, batching, scissor, blend e shaders para a UI 2D;
 - [ ] textura de vídeo/imagem e upload assíncrono;
-- [ ] manter o software como fallback e para CI;
+- [x] manter o software como fallback e para CI;
 - [ ] comparar fps, memória e qualidade nos samples.
 
 **Aceite:** starter e samples visualmente equivalentes a 1080p60 no GPU, com

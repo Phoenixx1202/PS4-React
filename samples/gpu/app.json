@@ -1,0 +1,17 @@
+{
+  "$schema": "../../app.schema.json",
+  "titleId": "CUSA99076",
+  "contentId": "UP0001-CUSA99076_00-PS4SAMPLEGPU0001",
+  "name": "PS4 React Sample: GPU",
+  "version": "01.000.000",
+  "gpu": true,
+  "render": {
+    "width": 2560,
+    "height": 1440
+  },
+  "surface": {
+    "width": 1920,
+    "height": 1080
+  },
+  "timeoutSeconds": 30
+}

@@ -33,6 +33,8 @@ The default build produces a single installable package:
 - **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
 - **Music** playback: MP3 decoding, 48 kHz resampling and the mixer's music
   deck (local files; HTTP streaming is pending).
+- **GPU presentation** through Piglet/OpenGL ES (`"gpu": true`), with the
+  software VideoOut path as fallback.
 - **Multi-controller input** with one pad per logged-in user and
   `useGamepad(playerIndex)`; any pad navigates the UI.
 - **Device information** (model, firmware, CPU frequency/temperature, SoC

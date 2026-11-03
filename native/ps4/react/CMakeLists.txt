@@ -24,6 +24,7 @@ endif()
 
 option(PS4_REACT_DEV_SERVER "Enable the TCP hot-reload receiver" OFF)
 option(PS4_REACT_PRIVILEGED "Package with the system auth id used by installer apps" OFF)
+option(PS4_REACT_GPU "Present through Piglet/OpenGL ES instead of VideoOut" OFF)
 
 set(ER_BRIDGE_QUICKJS_SMOKE OFF CACHE BOOL "" FORCE)
 set(ER_BRIDGE_QUICKJS_RUNTEST OFF CACHE BOOL "" FORCE)
@@ -96,6 +97,11 @@ add_executable(ps4_react_starter
     "${PS4_REACT_GENERATED_DIR}/sounds.generated.c"
     "${PS4_REACT_GENERATED_DIR}/bundle.c"
 )
+
+if(PS4_REACT_GPU)
+    target_sources(ps4_react_starter PRIVATE ../gpu_display.cpp)
+    target_link_libraries(ps4_react_starter PRIVATE ScePigletv2VSH)
+endif()
 
 if(PS4_REACT_DEV_SERVER)
     target_sources(ps4_react_starter PRIVATE ../dev_server.cpp)

@@ -21,6 +21,10 @@
 
 #include "app_config.generated.h"
 
+#if PS4_REACT_GPU
+#include "gpu_display.hpp"
+#endif
+
 extern "C" {
 #include "assets.generated.h"
 #include "er_runtime.h"
@@ -155,10 +159,23 @@ int main() {
     ps4::system::initialize_services();
 
     Display display;
-    if (!display.open(kWidth, kHeight)) {
+#if PS4_REACT_GPU
+    GpuDisplay gpu;
+    const bool have_gpu = gpu.open(kWidth, kHeight);
+    ps4::system::log("PS4 React Starter: gpu presentation=%s", have_gpu ? "yes" : "no");
+#else
+    constexpr bool have_gpu = false;
+#endif
+    if (!have_gpu && !display.open(kWidth, kHeight)) {
         ps4::system::log("PS4 React Starter: display open failed");
         ps4::system::park();
     }
+    const auto present = [&](const std::uint32_t* pixels) -> bool {
+#if PS4_REACT_GPU
+        if (have_gpu) return gpu.present(pixels);
+#endif
+        return display.present(pixels, kWidth, kHeight);
+    };
 
     std::array<Pad, 4> pads;
     int pad_count = 0;
@@ -235,7 +252,7 @@ int main() {
             er_runtime_show_error();
             er_commit();
             if (const auto* pixels = er_software_framebuffer())
-                display.present(pixels, kWidth, kHeight);
+                present(pixels);
         }
         ps4::system::sleep_us(3000000);
         ps4::system::park();
@@ -324,7 +341,7 @@ int main() {
             fatal("commit error");
         }
 
-        if (!display.present(er_software_framebuffer(), kWidth, kHeight)) {
+        if (!present(er_software_framebuffer())) {
             ps4::system::log("PS4 React Starter: present failed");
             break;
         }

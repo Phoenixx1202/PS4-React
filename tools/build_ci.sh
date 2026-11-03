@@ -156,10 +156,11 @@ APP_META=$(python3 - "$APP/app.json" <<'PY'
 import json, sys
 app = json.load(open(sys.argv[1], encoding='utf-8'))
 print('\x1f'.join((app['titleId'], app['contentId'], app['name'], app['version'],
-                  '1' if app.get('privileged', False) else '0')))
+                  '1' if app.get('privileged', False) else '0',
+                  '1' if app.get('gpu', False) else '0')))
 PY
 )
-IFS=$'\x1f' read -r TITLE_ID CONTENT_ID TITLE VERSION PRIVILEGED <<< "$APP_META"
+IFS=$'\x1f' read -r TITLE_ID CONTENT_ID TITLE VERSION PRIVILEGED GPU <<< "$APP_META"
 
 rm -rf "$GEN"
 mkdir -p "$GEN/app"
@@ -201,6 +202,7 @@ cmake -S "$ROOT" -B "$BUILD" \
     -DPS4_REACT_GENERATED_DIR="$GEN" \
     -DPS4_REACT_CRT1="$CRT1" \
     -DPS4_REACT_PRIVILEGED="$([ "$PRIVILEGED" = "1" ] && echo ON || echo OFF)" \
+    -DPS4_REACT_GPU="$([ "$GPU" = "1" ] && echo ON || echo OFF)" \
     -DPS4_REACT_DEV_SERVER="$([ "$DEV_SERVER" = "1" ] && echo ON || echo OFF)"
 cmake --build "$BUILD" --target ps4_react_starter_stage --parallel "$(nproc)"
 
