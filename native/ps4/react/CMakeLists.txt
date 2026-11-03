@@ -137,8 +137,6 @@ target_link_libraries(ps4_react_starter PRIVATE
     er-software
     embedded-react
     SceSysmodule
-    SceAppInstUtil
-    SceBgft
     SceSaveData
     SceCommonDialog
     SceMsgDialog

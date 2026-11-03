@@ -6,8 +6,8 @@
 #include "app_config.generated.h"
 #include "system.hpp"
 
-#include <orbis/AppInstUtil.h>
 #include <orbis/Bgft.h>
+#include <orbis/libkernel.h>
 
 #include <algorithm>
 #include <atomic>
@@ -43,11 +43,32 @@ struct Task {
 std::mutex tasks_mutex;
 std::vector<std::shared_ptr<Task>> tasks;
 std::atomic<std::uint32_t> next_id{1};
-std::once_flag appinst_init;
-int appinst_init_result = 0;
-std::once_flag bgft_init;
-int bgft_init_result = 0;
-void* bgft_heap = nullptr;
+
+// The installer modules are privileged system libraries. Linking them creates
+// import stubs that GoldHEN treats as unpatched calls (and crashes the app), so
+// load the modules explicitly and resolve every entry point at run time.
+struct AppInstApi {
+    std::int32_t module = -1;
+    int (*initialize)() = nullptr;
+    int (*get_title_id)(const char*, char*, int*) = nullptr;
+    int (*exists)(const char*, int*) = nullptr;
+    int (*uninstall)(const char*) = nullptr;
+};
+
+struct BgftApi {
+    std::int32_t module = -1;
+    int (*init)(OrbisBgftInitParams*) = nullptr;
+    int (*register_storage)(OrbisBgftDownloadParamEx*, OrbisBgftTaskId*) = nullptr;
+    int (*start)(OrbisBgftTaskId) = nullptr;
+    int (*stop)(OrbisBgftTaskId) = nullptr;
+    int (*unregister)(OrbisBgftTaskId) = nullptr;
+    int (*progress)(OrbisBgftTaskId, OrbisBgftTaskProgress*) = nullptr;
+};
+
+AppInstApi appinst;
+BgftApi bgft;
+std::once_flag api_init;
+int api_init_error = 0;
 
 // OpenOrbis' OrbisBgftTaskProgress uses 32-bit sizes, but the firmware fills
 // 64-bit size_t fields (flatz's and Itemzflow's layouts). Read the real 64-byte
@@ -114,8 +135,7 @@ bool valid_title_id(const std::string& id) {
     return true;
 }
 
-// The outer PKG header stores the 36-byte content id at 0x40. The install
-// service reports progress by content id, so read it from the file.
+// The outer PKG header stores the 36-byte content id at 0x40.
 bool read_content_id(const std::string& path, std::string& out) {
     std::FILE* file = std::fopen(path.c_str(), "rb");
     if (!file) return false;
@@ -132,33 +152,73 @@ bool read_content_id(const std::string& path, std::string& out) {
     return true;
 }
 
-bool initialize_appinst(Task& task) {
-    std::call_once(appinst_init, [] { appinst_init_result = sceAppInstUtilInitialize(); });
-    if (appinst_init_result != 0 &&
-        appinst_init_result != static_cast<int>(0x80a10001u)) {
-        fail(task, "sceAppInstUtilInitialize failed", appinst_init_result);
+std::int32_t load_module(const char* path) {
+    const std::uint32_t raw =
+        sceKernelLoadStartModule(path, 0, nullptr, 0, nullptr, nullptr);
+    const std::int32_t handle = static_cast<std::int32_t>(raw);
+    ps4::system::log("packages: %s module=0x%08x", path, static_cast<unsigned>(raw));
+    return handle;
+}
+
+template <typename Function>
+bool resolve_symbol(std::int32_t module, const char* name, Function& function) {
+    void* address = nullptr;
+    const int result = sceKernelDlsym(module, name, &address);
+    if (result != 0 || !address) {
+        ps4::system::log("packages: dlsym %s=0x%08x", name, static_cast<unsigned>(result));
         return false;
     }
+    function = reinterpret_cast<Function>(address);
     return true;
 }
 
-bool initialize_bgft(Task& task) {
-    std::call_once(bgft_init, [] {
-        bgft_heap = std::malloc(1024 * 1024);
-        if (!bgft_heap) {
-            bgft_init_result = -1;
+int initialize_services() {
+    std::call_once(api_init, [] {
+        appinst.module = load_module("/system/common/lib/libSceAppInstUtil.sprx");
+        if (appinst.module < 0) {
+            api_init_error = appinst.module;
             return;
         }
+        if (!resolve_symbol(appinst.module, "sceAppInstUtilInitialize", appinst.initialize) ||
+            !resolve_symbol(appinst.module, "sceAppInstUtilGetTitleIdFromPkg", appinst.get_title_id) ||
+            !resolve_symbol(appinst.module, "sceAppInstUtilAppExists", appinst.exists) ||
+            !resolve_symbol(appinst.module, "sceAppInstUtilAppUnInstall", appinst.uninstall)) {
+            api_init_error = -1;
+            return;
+        }
+
+        bgft.module = load_module("/system/common/lib/libSceBgft.sprx");
+        if (bgft.module < 0) {
+            api_init_error = bgft.module;
+            return;
+        }
+        if (!resolve_symbol(bgft.module, "sceBgftServiceIntInit", bgft.init) ||
+            !resolve_symbol(bgft.module, "sceBgftServiceIntDownloadRegisterTaskByStorageEx",
+                            bgft.register_storage) ||
+            !resolve_symbol(bgft.module, "sceBgftServiceDownloadStartTask", bgft.start) ||
+            !resolve_symbol(bgft.module, "sceBgftServiceDownloadStopTask", bgft.stop) ||
+            !resolve_symbol(bgft.module, "sceBgftServiceIntDownloadUnregisterTask",
+                            bgft.unregister) ||
+            !resolve_symbol(bgft.module, "sceBgftServiceDownloadGetProgress", bgft.progress)) {
+            api_init_error = -1;
+            return;
+        }
+
         OrbisBgftInitParams params{};
-        params.heap = bgft_heap;
+        params.heap = std::malloc(1024 * 1024);
         params.heapSize = 1024 * 1024;
-        bgft_init_result = sceBgftServiceIntInit(&params);
+        if (!params.heap) {
+            api_init_error = -1;
+            return;
+        }
+        const int result = bgft.init(&params);
+        if (result != 0) {
+            api_init_error = result;
+            return;
+        }
+        ps4::system::log("packages: installer services ready");
     });
-    if (bgft_init_result != 0) {
-        fail(task, "sceBgftServiceIntInit failed", bgft_init_result);
-        return false;
-    }
-    return true;
+    return api_init_error;
 }
 
 int foreground_user_id() {
@@ -185,7 +245,7 @@ int register_install(Task& task, int& error) {
     params.slot = 0;
 
     OrbisBgftTaskId id = -1;
-    int result = sceBgftServiceIntDownloadRegisterTaskByStorageEx(&params, &id);
+    int result = bgft.register_storage(&params, &id);
     if (result == 0) {
         error = 0;
         return id;
@@ -196,11 +256,11 @@ int register_install(Task& task, int& error) {
     if ((result == static_cast<int>(0x80990088u) ||
          result == static_cast<int>(0x80990015u)) && task.overwrite) {
         ps4::system::log("packages: replacing %s before install", task.title_id.c_str());
-        const int removed = sceAppInstUtilAppUnInstall(task.title_id.c_str());
+        const int removed = appinst.uninstall(task.title_id.c_str());
         if (removed != 0)
             ps4::system::log("packages: replace uninstall %s=0x%08x",
                              task.title_id.c_str(), static_cast<unsigned>(removed));
-        result = sceBgftServiceIntDownloadRegisterTaskByStorageEx(&params, &id);
+        result = bgft.register_storage(&params, &id);
         if (result == 0) {
             error = 0;
             return id;
@@ -212,18 +272,20 @@ int register_install(Task& task, int& error) {
 
 void run_install(const std::shared_ptr<Task>& task) {
     task->state = State::installing;
-    if (!initialize_appinst(*task)) return;
-    if (!initialize_bgft(*task)) return;
+    const int services = initialize_services();
+    if (services != 0) {
+        fail(*task, "installer services are unavailable", services);
+        return;
+    }
 
-    int result = 0;
     char title_id[16] = {};
     int is_app = 0;
     std::string pkg_path = task->path;
-    result = sceAppInstUtilGetTitleIdFromPkg(pkg_path.c_str(), title_id, &is_app);
+    int result = appinst.get_title_id(pkg_path.c_str(), title_id, &is_app);
     if (result != 0 && pkg_path.rfind("/data/", 0) == 0) {
         // ShellCore sees the console's data tree as /user/data.
         pkg_path = "/user" + pkg_path;
-        result = sceAppInstUtilGetTitleIdFromPkg(pkg_path.c_str(), title_id, &is_app);
+        result = appinst.get_title_id(pkg_path.c_str(), title_id, &is_app);
     }
     if (result != 0) {
         fail(*task, "sceAppInstUtilGetTitleIdFromPkg failed", result);
@@ -238,13 +300,13 @@ void run_install(const std::shared_ptr<Task>& task) {
     read_content_id(task->path, task->content_id);
 
     int exists = 0;
-    result = sceAppInstUtilAppExists(task->title_id.c_str(), &exists);
+    result = appinst.exists(task->title_id.c_str(), &exists);
     if (result == 0 && exists) {
         if (!task->overwrite) {
             fail(*task, "the title is already installed; uninstall it first or pass overwrite: true");
             return;
         }
-        result = sceAppInstUtilAppUnInstall(task->title_id.c_str());
+        result = appinst.uninstall(task->title_id.c_str());
         if (result != 0) {
             fail(*task, "sceAppInstUtilAppUnInstall failed", result);
             return;
@@ -259,9 +321,9 @@ void run_install(const std::shared_ptr<Task>& task) {
         return;
     }
     task->bgft_task = id;
-    result = sceBgftServiceDownloadStartTask(id);
+    result = bgft.start(id);
     if (result != 0) {
-        (void)sceBgftServiceIntDownloadUnregisterTask(id);
+        (void)bgft.unregister(id);
         task->bgft_task = -1;
         fail(*task, "sceBgftServiceDownloadStartTask failed", result);
         return;
@@ -272,10 +334,14 @@ void run_install(const std::shared_ptr<Task>& task) {
 
 void run_uninstall(const std::shared_ptr<Task>& task) {
     task->state = State::uninstalling;
-    if (!initialize_appinst(*task)) return;
+    const int services = initialize_services();
+    if (services != 0) {
+        fail(*task, "installer services are unavailable", services);
+        return;
+    }
 
     int exists = 0;
-    int result = sceAppInstUtilAppExists(task->title_id.c_str(), &exists);
+    int result = appinst.exists(task->title_id.c_str(), &exists);
     if (result != 0) {
         fail(*task, "sceAppInstUtilAppExists failed", result);
         return;
@@ -285,7 +351,7 @@ void run_uninstall(const std::shared_ptr<Task>& task) {
         return;
     }
 
-    result = sceAppInstUtilAppUnInstall(task->title_id.c_str());
+    result = appinst.uninstall(task->title_id.c_str());
     if (result != 0) {
         fail(*task, "sceAppInstUtilAppUnInstall failed", result);
         return;
@@ -384,10 +450,10 @@ JSValue cancel(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     std::lock_guard<std::mutex> lock(tasks_mutex);
     for (const auto& task : tasks) {
         if (task->id == id) {
-            const int bgft = task->bgft_task.exchange(-1);
-            if (bgft >= 0) {
-                (void)sceBgftServiceDownloadStopTask(bgft);
-                (void)sceBgftServiceIntDownloadUnregisterTask(bgft);
+            const int bgft_task = task->bgft_task.exchange(-1);
+            if (bgft_task >= 0 && bgft.stop && bgft.unregister) {
+                (void)bgft.stop(bgft_task);
+                (void)bgft.unregister(bgft_task);
             }
             task->state = State::cancelled;
             break;
@@ -397,21 +463,21 @@ JSValue cancel(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
 }
 
 void update_install_progress(Task& task) {
-    const int bgft = task.bgft_task;
-    if (bgft < 0) return;
+    const int bgft_task = task.bgft_task;
+    if (bgft_task < 0 || !bgft.progress) return;
 
     BgftTaskProgress progress{};
-    const int result = sceBgftServiceDownloadGetProgress(
-        bgft, reinterpret_cast<OrbisBgftTaskProgress*>(&progress));
+    const int result = bgft.progress(
+        bgft_task, reinterpret_cast<OrbisBgftTaskProgress*>(&progress));
     if (result != 0) {
         fail(task, "sceBgftServiceDownloadGetProgress failed", result);
-        (void)sceBgftServiceIntDownloadUnregisterTask(bgft);
+        if (bgft.unregister) (void)bgft.unregister(bgft_task);
         task.bgft_task = -1;
         return;
     }
     if (progress.error_result != 0) {
         fail(task, "BGFT install failed", progress.error_result);
-        (void)sceBgftServiceIntDownloadUnregisterTask(bgft);
+        if (bgft.unregister) (void)bgft.unregister(bgft_task);
         task.bgft_task = -1;
         return;
     }
@@ -437,7 +503,7 @@ void update_install_progress(Task& task) {
     // The copy is complete; wait for the install service to register the
     // title in app.db before reporting completion.
     int exists = 0;
-    const int check = sceAppInstUtilAppExists(task.title_id.c_str(), &exists);
+    const int check = appinst.exists ? appinst.exists(task.title_id.c_str(), &exists) : 0;
     if (check == 0 && exists) {
         task.percent = 100;
         task.state = State::completed;
