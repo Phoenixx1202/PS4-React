@@ -141,9 +141,12 @@ def main() -> int:
     for key, (value, size) in strings.items():
         run(tool, "sfo_setentry", sfo, key, "--type", "Utf8",
             "--maxsize", size, "--value", value, env=env)
+    # ATTRIBUTE bit 1 (0x02) fixes Cross as the common-dialog enter button.
+    # Without it the IME follows the console's region assignment, so a
+    # Circle-confirm console shows Cross as cancel in the keyboard.
     for key, value in {
         "APP_TYPE": 1,
-        "ATTRIBUTE": 0,
+        "ATTRIBUTE": 2,
         "DOWNLOAD_DATA_SIZE": 0,
         "SYSTEM_VER": 0,
     }.items():
