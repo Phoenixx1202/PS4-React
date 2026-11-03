@@ -208,7 +208,12 @@ patches/             pinned Embedded React patches
 Validated on PS4 hardware:
 
 - VideoOut 1920×1080 at ~60 fps;
-- React/QuickJS starter with focus, input and Options exit;
+- React/QuickJS starter with focus and input;
+- big-app PKG registration (`CATEGORY=gd`) and a dlmalloc heap over mapped
+  system flexible memory, replacing the stock libc heap that fails on retail;
+- clean Options exit through `sceKernelGetAppInfo` and
+  `sceSystemServiceKillApp`, with save-data unmount before the system suspends
+  the title;
 - `sceAudioOut` mixer and interface sounds;
 - HTTPS requests (IPv4, CA bundle in `/app0`);
 - downloads to `/download0` with completion receipts and resume;
