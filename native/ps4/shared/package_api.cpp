@@ -3,6 +3,8 @@
 // Additional attribution term: see LICENSE-ATTRIBUTION.
 #include "host_api.hpp"
 
+#include "system.hpp"
+
 #include <orbis/AppInstUtil.h>
 
 #include <atomic>
@@ -27,6 +29,7 @@ struct Task {
     bool uninstall = false;
     std::atomic<State> state{State::queued};
     std::atomic<int> percent{0};
+    std::atomic<bool> progress_logged{false};
     std::mutex error_mutex;
     std::string error;
 };
@@ -59,6 +62,8 @@ void fail(Task& task, const char* message, int code = 0) {
         }
     }
     task.state = State::failed;
+    ps4::system::log("packages: %s failed: %s", task.title_id.empty() ? "task" : task.title_id.c_str(),
+                     task.error.c_str());
 }
 
 bool resolve(JSContext* ctx, JSValueConst value, std::string& out) {
@@ -134,6 +139,9 @@ void run_install(const std::shared_ptr<Task>& task) {
     }
     task->percent = 100;
     task->state = State::completed;
+    ps4::system::log("packages: installed %s from %s",
+                     task->title_id.empty() ? "?" : task->title_id.c_str(),
+                     task->path.c_str());
 }
 
 void run_uninstall(const std::shared_ptr<Task>& task) {
@@ -157,6 +165,7 @@ void run_uninstall(const std::shared_ptr<Task>& task) {
         return;
     }
     task->state = State::completed;
+    ps4::system::log("packages: uninstalled %s", task->title_id.c_str());
 }
 
 void* task_entry(void* value) {
@@ -275,6 +284,12 @@ JSValue poll(JSContext* ctx, JSValueConst, int, JSValueConst*) {
                 if (progress > 100) progress = 100;
                 percent = static_cast<int>(progress);
                 task->percent = percent;
+                if (progress > 0 && !task->progress_logged.exchange(true)) {
+                    ps4::system::log(
+                        "packages: install progress %s %u%% state=%u size=%u/%u",
+                        task->content_id.c_str(), progress, install_state,
+                        progress_size, total_size);
+                }
                 JS_SetPropertyStr(ctx, item, "installState", JS_NewUint32(ctx, install_state));
                 JS_SetPropertyStr(ctx, item, "written", JS_NewFloat64(ctx, progress_size));
                 JS_SetPropertyStr(ctx, item, "total", JS_NewFloat64(ctx, total_size));
