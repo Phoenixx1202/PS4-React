@@ -238,15 +238,17 @@ limitação técnica/legal.
 
 ### 3.2 Payloads
 
-- [ ] definir modelo seguro: cliente BinLoader (GoldHEN, porta 9090) para
-  payloads do próprio usuário, sem execução arbitrária no processo do app;
-- [ ] API `Payloads.send(path|bytes)`, progresso, erro e `isAvailable`;
-- [ ] limites de tamanho, origem e confirmação do usuário;
-- [ ] auditoria de segurança e documentação legal;
-- [ ] teste com payload de exemplo.
+- [x] modelo seguro: cliente BinLoader (GoldHEN, porta 9090) para payloads do
+  próprio usuário, sem execução arbitrária no processo do app;
+- [x] API `Payloads.send(path)`, progresso, erro e `isAvailable` (lê o
+  `config.ini`; uma conexão TCP vazia derruba o accept loop do BinLoader);
+- [x] limites de tamanho (64 MiB), ELF obrigatório, origem resolvida e
+  confirmação do usuário no sample;
+- [ ] auditoria de segurança formal e documentação legal;
+- [x] teste com payload de exemplo (`ps4-manager` ELF, enviado sem crash).
 
-**Aceite:** enviar um payload de teste ao BinLoader sem crash; nenhuma
-execução silenciosa.
+**Aceite:** enviar um payload de teste ao BinLoader sem crash; nenhuma execução
+silenciosa. Validado no hardware; a auditoria formal fica pendente.
 
 ## Fase 4 — GPU, 4K e HDR (P2)
 
@@ -367,6 +369,13 @@ firmware/GoldHEN:
   do zero. `sceLncUtilLaunchApp` não é exportado no processo e o import direto
   crasha. PKG `8210a1ce35ba4b3abf9f13dd94e69bb7db53927ed9ddbb70eac5288d74e6067b`;
   commit local `eb13b35`, sem push.
+- 2026-11-03 - Payloads/BinLoader validado no hardware (sample payloads):
+  `payloads: sending /data/pkg/payload.elf (193728 bytes)` ->
+  `payloads: sent /data/pkg/payload.elf` com o `ps4-manager` ELF. O
+  `isAvailable` lê `/data/GoldHEN/config.ini`; uma conexão TCP vazia pode
+  derrubar o accept loop do BinLoader, então o envio é o teste real. PKG
+  `8318d7fd67dc8b0075e3fb3f819641c7eb992c4c0fae231ff1172dc4bf70a5ee`,
+  commit local `7bca09e`, sem push.
 ```
 
 ## Changelog do plano

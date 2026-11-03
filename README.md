@@ -249,6 +249,8 @@ Known limitations:
 - `Packages` requires an app packaged with `"privileged": true`; it loads the
   internal AppInstUtil/BGFT sysmodules and installs through BGFT. Validated on
   the target PS4 5.05/GoldHEN console; large and invalid PKGs are untested.
+- `Payloads.isAvailable` reads GoldHEN's config: a bare TCP connect to port
+  9090 can stop BinLoader's accept loop. Use `Payloads.send` as the real test.
 - Runtime text shaping needs the app to package the Noto fonts it uses.
 - Hot reload only replaces JavaScript; asset changes require a new PKG.
 
