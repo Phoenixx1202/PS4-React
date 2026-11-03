@@ -136,6 +136,14 @@ void device_info(DeviceInfo& info) {
         std::snprintf(info.firmware, sizeof info.firmware, "0x%08x", version.Version);
     const int frequency = sceKernelGetCpuFrequency();
     if (frequency > 0) info.cpu_frequency = frequency;
+    // libkernel exports this with a pointer parameter that OpenOrbis'
+    // placeholder prototype omits.
+    using AvailableFlexibleFn = int (*)(size_t*);
+    const auto available = reinterpret_cast<AvailableFlexibleFn>(
+        sceKernelAvailableFlexibleMemorySize);
+    size_t bytes = 0;
+    if (available && available(&bytes) == 0)
+        info.free_memory = static_cast<std::int64_t>(bytes);
     info.process_time = static_cast<std::int64_t>(sceKernelGetProcessTime());
     std::snprintf(info.language, sizeof info.language, "en-US");
 }

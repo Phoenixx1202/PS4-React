@@ -30,7 +30,8 @@ function snapshot() {
 function App() {
   const [state, setState] = useState(snapshot);
   const {device, foreground, users} = state;
-  const mb = value => value >= 0 ? `${(value / (1024 * 1024)).toFixed(0)} MB` : '?';
+  const mb = value => value == null || value < 0 ? 'n/a' : `${(value / (1024 * 1024)).toFixed(0)} MB`;
+  const temperature = value => value == null || value < 0 ? 'n/a' : `${value}C`;
 
   return (
     <FocusScope wrap>
@@ -49,7 +50,7 @@ function App() {
             {`CPU ${device.cpuFrequency > 0 ? `${(device.cpuFrequency / 1000000).toFixed(0)} MHz` : '?'}  |  free ${mb(device.freeMemory)}`}
           </Text>
           <Text style={{fontFamily: font, fontSize: 26, color: '#c8d6e5'}}>
-            {`CPU temp ${device.cpuTemperature >= 0 ? `${device.cpuTemperature}C` : '?'}  |  SoC temp ${device.socTemperature >= 0 ? `${device.socTemperature}C` : '?'}`}
+            {`CPU temp ${temperature(device.cpuTemperature)}  |  SoC temp ${temperature(device.socTemperature)}`}
           </Text>
           <Text style={{fontFamily: font, fontSize: 26, color: '#c8d6e5'}}>
             {`Foreground user: ${foreground ? foreground.name : 'none'}  |  logged in: ${users.length}`}
