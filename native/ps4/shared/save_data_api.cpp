@@ -9,6 +9,7 @@
 #include <orbis/SaveData.h>
 
 #include <cstdio>
+#include <cstdint>
 #include <cstring>
 #include <map>
 #include <mutex>
@@ -19,6 +20,10 @@ namespace {
 struct Mounted {
     std::string path;
     OrbisSaveDataMountPoint point{};
+    int user = -1;
+    std::uint32_t blocks = ORBIS_SAVE_DATA_BLOCKS_MIN2;
+    std::uint32_t mount_mode = 0;
+    bool suspended = false;
 };
 
 std::mutex mount_mutex;
@@ -169,6 +174,9 @@ JSValue mount(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
         ++path_length;
     entry.path.assign(result.mountPathName, path_length);
     std::memcpy(entry.point.data, result.mountPathName, sizeof entry.point.data);
+    entry.user = user;
+    entry.blocks = blocks;
+    entry.mount_mode = request.mountMode;
     if (entry.path.empty()) {
         sceSaveDataUmount(&entry.point);
         return JS_ThrowPlainError(ctx, "SaveData.mount: the system returned an empty mount point");
@@ -265,8 +273,63 @@ JSValue ps4_react_save_data_api(JSContext* ctx) {
 extern "C" void ps4_react_save_data_shutdown() {
     std::lock_guard<std::mutex> lock(mount_mutex);
     for (auto& [name, entry] : mounted) {
-        (void)sceSaveDataUmount(&entry.point);
+        if (!entry.suspended)
+            (void)sceSaveDataUmount(&entry.point);
         (void)name;
     }
     mounted.clear();
+}
+
+// The system suspends the title when it goes to the background. Unmount every
+// directory first so SceSaveData does not hold an app-suspend block.
+extern "C" void ps4_react_save_data_suspend() {
+    std::lock_guard<std::mutex> lock(mount_mutex);
+    for (auto& [name, entry] : mounted) {
+        if (entry.suspended)
+            continue;
+        const int code = sceSaveDataUmount(&entry.point);
+        if (code == 0) {
+            entry.suspended = true;
+            ps4::system::log("saveData: suspended %s", name.c_str());
+        } else {
+            ps4::system::log("saveData: suspend umount %s=0x%08x", name.c_str(),
+                             static_cast<unsigned>(code));
+        }
+    }
+}
+
+// Reopens the directories that were mounted when the title went to the
+// background. The mount point normally stays /savedata0.
+extern "C" void ps4_react_save_data_resume() {
+    std::lock_guard<std::mutex> lock(mount_mutex);
+    for (auto& [name, entry] : mounted) {
+        if (!entry.suspended)
+            continue;
+        OrbisSaveDataDirName dir_name{};
+        std::snprintf(dir_name.data, sizeof dir_name.data, "%s", name.c_str());
+        OrbisSaveDataMount2 request{};
+        request.userId = entry.user;
+        request.dirName = &dir_name;
+        request.blocks = entry.blocks;
+        request.mountMode = entry.mount_mode;
+        OrbisSaveDataMountResult result{};
+        int code = sceSaveDataMount2(&request, &result);
+        if (code == static_cast<int>(0x809f0007u)) {
+            request.mountMode &= ~ORBIS_SAVE_DATA_MOUNT_MODE_CREATE2;
+            result = {};
+            code = sceSaveDataMount2(&request, &result);
+        }
+        if (code != 0) {
+            ps4::system::log("saveData: resume %s=0x%08x", name.c_str(),
+                             static_cast<unsigned>(code));
+            continue;
+        }
+        std::size_t path_length = 0;
+        while (path_length < sizeof result.mountPathName && result.mountPathName[path_length])
+            ++path_length;
+        entry.path.assign(result.mountPathName, path_length);
+        std::memcpy(entry.point.data, result.mountPathName, sizeof entry.point.data);
+        entry.suspended = false;
+        ps4::system::log("saveData: resumed %s at %s", name.c_str(), entry.path.c_str());
+    }
 }

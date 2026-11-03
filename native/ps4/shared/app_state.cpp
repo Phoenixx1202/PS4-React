@@ -118,8 +118,11 @@ void handle(const SystemServiceEvent& event) {
             record(event.type, name);
         }
         if (event.type == kOnResume) {
-            std::lock_guard<std::mutex> lock(state_mutex);
-            state = "active";
+            {
+                std::lock_guard<std::mutex> lock(state_mutex);
+                state = "active";
+            }
+            ps4_react_save_data_resume();
         }
         return;
     }
@@ -166,8 +169,13 @@ void ps4_react_app_state_pump() {
             changed = true;
         }
     }
-    if (changed)
+    if (changed) {
         record(-1, next);
+        if (std::strcmp(next, "background") == 0)
+            ps4_react_save_data_suspend();
+        else
+            ps4_react_save_data_resume();
+    }
 }
 
 JSValue ps4_react_app_state_api(JSContext* ctx) {

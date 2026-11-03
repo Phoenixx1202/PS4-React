@@ -61,16 +61,20 @@ Critério de conclusão padrão:
 
 ### 1.1 Eventos de sistema e ciclo de vida
 
-- [ ] bombear `sceSystemServiceReceiveEvent` no loop principal;
-- [ ] tratar suspend/resume (rest mode e PS button): pausar áudio/rede,
-  suspender render, salvar estado e remontar no resume;
-- [ ] tratar foco/desfoque do app, login/logout e troca de usuário;
-- [ ] expor `AppState` no JS (`active`, `background`, `suspending`, `resumed`);
-- [ ] liberar suspend blocks (save data, IME, common dialog) antes de suspender;
-- [ ] teste de hardware: rest mode, PS button, resume e logout sem crash.
+- [x] bombear `sceSystemServiceReceiveEvent` no loop principal (validado no
+  hardware; este firmware não entrega `OnResume`, então o estado vem do poll de
+  `sceSystemServiceGetStatus`);
+- [x] detectar `background`/`active` e desmontar/remontar o save data nessa
+  transição (validado no sample de settings);
+- [ ] pausar/retomar áudio e rede, e suspender/retomar o render;
+- [x] expor `AppState` no JS (`active`/`background`, listener `change`);
+- [ ] tratar foco/desfoque, login/logout e troca de usuário;
+- [ ] liberar IME/common dialog antes de suspender (save data já resolvido);
+- [ ] teste de hardware: rest mode direto e logout sem crash.
 
 **Aceite:** suspend/resume em ~1 s, sem perda de save, áudio/rede retomam, JS
-recebe os eventos.
+recebe os eventos. Background/active e save data validados; rest mode direto e
+áudio/rede pendentes.
 
 ### 1.2 Diálogos do sistema
 
@@ -109,9 +113,11 @@ app.db.
 
 ### 1.5 Save data: polimento
 
+- [x] desmontar no background e remontar no active/resume (validado; o suspend
+  block do `SceSaveData` deixa de travar o suspend do sistema);
 - [ ] adicionar `save_data.png` em `sce_sys` (o KLog acusa ausente);
 - [ ] ícone, título e subtítulo no diálogo de save;
-- [ ] tratar suspend/crash sem deixar mount pendurado;
+- [ ] tratar crash sem deixar mount pendurado;
 - [ ] limite de mounts e mensagens de erro melhores.
 
 ### 1.6 Fontes e texto
@@ -326,6 +332,12 @@ firmware/GoldHEN:
 - 2026-11-02 - Dialog.alert/Dialog.confirm validados no hardware (sample
   dialogs, PKG 6fef91d3681a7a929193c8159c5d1c4f449927aa10fe5ae4430bfe6fe7bf1d9c);
   commit local d1bca53, sem push.
+- 2026-11-02 - pump de eventos/AppState e suspend do save data validados no
+  hardware (settings): `app: event background` -> `saveData: suspended
+  settings` -> `active` -> `resumed settings at /savedata0`; PKG
+  93a23790d01a7925156bd7c6eb786cfd61aa38b054a812f9e58d906ca9eb9e65.
+  `OnResume` não é entregue por este firmware; o poll de status cobre.
+  Exit após resume ainda a confirmar. Sem push.
 ```
 
 ## Changelog do plano

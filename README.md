@@ -231,7 +231,9 @@ Validated on PS4 hardware:
   through the `settings` sample;
 - the system on-screen keyboard feeding text back into React;
 - system message dialogs (`Dialog.alert`/`Dialog.confirm`) with Cross confirm
-  and input suppression while a dialog or the keyboard is open.
+  and input suppression while a dialog or the keyboard is open;
+- background/active lifecycle with save-data unmount/remount across the PS
+  button and resume.
 
 Known limitations:
 

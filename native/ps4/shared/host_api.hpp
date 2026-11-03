@@ -212,6 +212,9 @@ JSValue ps4_react_archive_api(JSContext* ctx);
 // ABI v5 additive package installs: install(path, name), cancel(id), poll().
 JSValue ps4_react_package_api(JSContext* ctx);
 JSValue ps4_react_save_data_api(JSContext* ctx);
+extern "C" void ps4_react_save_data_shutdown();
+extern "C" void ps4_react_save_data_suspend();
+extern "C" void ps4_react_save_data_resume();
 JSValue ps4_react_ime_api(JSContext* ctx);
 
 // ABI v7: system message dialogs. The render thread keeps running and

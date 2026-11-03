@@ -27,10 +27,6 @@ extern "C" {
 #include "er_scene.h"
 #include "native_renderer.h"
 #include "software_backend.h"
-
-// Defined in save_data_api.cpp: releases every save-data mount, and with it
-// the SceSaveData app-suspend block.
-void ps4_react_save_data_shutdown();
 }
 
 #if defined(PS4_REACT_DEV_SERVER)
