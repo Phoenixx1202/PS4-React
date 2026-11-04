@@ -198,11 +198,12 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 ### 2.1 Música e streaming
 
-- [x] decoder MP3 (minimp3) com resample para 48 kHz; OGG/Opus pendentes;
+- [x] decoder MP3 (minimp3) e OGG Vorbis (`stb_vorbis`) com resample para
+  48 kHz; Opus pendente (depende da API `libSceOpusCeltDec`);
 - [x] `Music.play(file|url)`, pause/resume/stop/volume: arquivo local validado;
-  URL HTTP(S) decodificada em fluxo com ring buffer de 1 MiB (sem baixar a
-  faixa inteira) e validada no hardware. `seek` funciona em arquivo local;
-  stream HTTP ainda não aceita seek;
+  URL HTTP(S) MP3/OGG decodificada em fluxo com ring buffer de 1 MiB (sem baixar
+  a faixa inteira) e validada no hardware. `seek` funciona em arquivo local
+  MP3/OGG; stream HTTP ainda não aceita seek;
 - [x] playlists no sample (`Previous`/`Next`/auto-avanço) e metadados ID3
   (`title`/`artist`/`album`) no status; capa ainda pendente. Crossfade de 1,5 s
   com dois decks de música e o terceiro stream do mixer validado no hardware;
@@ -213,7 +214,7 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 - [x] sample `music` (MP3 local e HTTP validados no hardware).
 
 **Aceite:** tocar MP3 local e stream HTTP com crossfade, sem underrun e com
-CPU baixa. MP3 local, stream HTTP e crossfade validados; OGG/Opus pendentes.
+CPU baixa. MP3 e OGG Vorbis locais/HTTP e crossfade validados; Opus pendente.
 
 ### 2.2 Vídeo
 
@@ -551,6 +552,15 @@ firmware/GoldHEN:
   trocas locais e a entrada do HTTP sem erro; o abort do GET antigo deixou de
   ser registrado como falha. Duração do HTTP estimada por Content-Length +
   bitrate. OGG/Opus, capa e BGM do sistema pendentes. Sem push.
+- 2026-11-03 - OGG Vorbis local e HTTP validados no hardware (sample music,
+  PKG `d94b79f3a035e794810154b86c2fa56f6e34949d62985d0cc3ff7ecddc111747`): o
+  `stb_vorbis` (domínio público, vendorizado) decodifica arquivo local e
+  pushdata sobre o mesmo ring HTTP; log
+  `music: /data/pkg/music.ogg 44100 Hz 2 ch, 16436736 frames` e
+  `music: http://.../music.ogg 44100 Hz 2 ch (stream)`, com GET no servidor,
+  seek local e crossfade. A duração do MP3 local foi corrigida (estava contando
+  samples intercalados; agora ~6:12 como o OGG). Opus, capa e BGM pendentes.
+  Sem push.
 ```
 
 ## Changelog do plano

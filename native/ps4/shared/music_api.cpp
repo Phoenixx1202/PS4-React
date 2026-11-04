@@ -16,11 +16,16 @@
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3_ex.h"
 
+#define STB_VORBIS_HEADER_ONLY
+#include "stb_vorbis.c"
+#undef STB_VORBIS_HEADER_ONLY
+
 #include <curl/curl.h>
 #include <pthread.h>
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -54,6 +59,7 @@ struct Task {
     std::uint32_t id = 0;
     std::string source;
     bool remote = false;
+    bool vorbis = false;
     int slot = 0;
     hui::audio::StreamRing* deck = nullptr;
     float volume = 1.0f;
@@ -321,6 +327,45 @@ void read_local_metadata(Task& task) {
     std::fclose(file);
 }
 
+bool vorbis_name(const std::string& source) {
+    std::string path = source;
+    const std::size_t query = path.find_first_of("?#");
+    if (query != std::string::npos) path.resize(query);
+    const std::size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos) return false;
+    std::string extension = path.substr(dot + 1);
+    for (char& c : extension) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return extension == "ogg" || extension == "oga";
+}
+
+bool local_vorbis(const std::string& path) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) return false;
+    char magic[4]{};
+    const bool ogg = std::fread(magic, 1, sizeof magic, file) == sizeof magic &&
+                     std::memcmp(magic, "OggS", 4) == 0;
+    std::fclose(file);
+    return ogg;
+}
+
+void vorbis_metadata(stb_vorbis* vorbis, Task& task) {
+    const stb_vorbis_comment comments = stb_vorbis_get_comment(vorbis);
+    Metadata metadata;
+    for (int i = 0; i < comments.comment_list_length; ++i) {
+        const char* entry = comments.comment_list[i];
+        if (!entry) continue;
+        const char* equals = std::strchr(entry, '=');
+        if (!equals) continue;
+        const std::string key(entry, equals);
+        const char* value = equals + 1;
+        if (key == "TITLE") metadata.title = value;
+        else if (key == "ARTIST") metadata.artist = value;
+        else if (key == "ALBUM") metadata.album = value;
+    }
+    if (!metadata.title.empty() || !metadata.artist.empty() || !metadata.album.empty())
+        set_metadata(task, metadata);
+}
+
 void update_http_metadata(HttpState& http) {
     std::lock_guard<std::mutex> lock(http.prefix_mutex);
     if (http.prefix_done) return;
@@ -455,7 +500,8 @@ void run_local(const std::shared_ptr<Task>& owner) {
         set_error(task, "invalid MP3 stream");
         return;
     }
-    const std::uint64_t source_frames = decoder.samples;
+    const std::uint64_t total_samples = decoder.samples;
+    const std::uint64_t source_frames = total_samples / static_cast<std::uint64_t>(channels);
     {
         std::lock_guard<std::mutex> lock(task.info_mutex);
         task.duration = source_frames ? static_cast<double>(source_frames) / hz : 0.0;
@@ -479,13 +525,13 @@ void run_local(const std::shared_ptr<Task>& owner) {
         }
         const std::uint64_t seek = task.seek_ms.exchange(kNoSeek);
         if (seek != kNoSeek) {
-            std::uint64_t sample = seek * static_cast<std::uint64_t>(hz) / 1000;
-            if (source_frames && sample >= source_frames) sample = source_frames - 1;
-            if (mp3dec_ex_seek(&decoder, sample) == 0) {
+            std::uint64_t frame = seek * static_cast<std::uint64_t>(hz) / 1000;
+            if (source_frames && frame >= source_frames) frame = source_frames - 1;
+            if (mp3dec_ex_seek(&decoder, frame * static_cast<std::uint64_t>(channels)) == 0) {
                 pending.clear();
-                pending_base = sample;
-                source_pos = static_cast<double>(sample);
-                task.position = sample * 48000ull / static_cast<std::uint64_t>(hz);
+                pending_base = frame;
+                source_pos = static_cast<double>(frame);
+                task.position = frame * 48000ull / static_cast<std::uint64_t>(hz);
                 eof = false;
             } else {
                 ps4::system::log("music: seek to %llu ms failed", static_cast<unsigned long long>(seek));
@@ -723,9 +769,257 @@ void run_remote(const std::shared_ptr<Task>& owner) {
     ps4::system::log("music: completed %s", task.source.c_str());
 }
 
+void run_vorbis(const std::shared_ptr<Task>& owner) {
+    Task& task = *owner;
+    std::shared_ptr<HttpState> http;
+    stb_vorbis* vorbis = nullptr;
+    std::vector<std::uint8_t> input;
+    std::vector<mp3d_sample_t> pcm;
+    std::vector<mp3d_sample_t> pending;
+    std::vector<float> output(kOutputFrames * 2);
+    std::uint64_t pending_base = 0;
+    double source_pos = 0.0;
+    int hz = 0, channels = 0;
+    double ratio = 1.0;
+    bool eof = false;
+    bool seek_warned = false;
+
+    auto drain = [&](bool final) {
+        const std::uint64_t pending_end = pending_base + pending.size() / channels;
+        std::size_t produced = 0;
+        while (produced < kOutputFrames) {
+            const std::uint64_t index = static_cast<std::uint64_t>(std::floor(source_pos));
+            if (index >= pending_end) break;
+            if (!final && index + 1 >= pending_end) break;
+            const double fraction = source_pos - static_cast<double>(index);
+            const std::size_t at = static_cast<std::size_t>(index - pending_base);
+            const std::size_t next = index + 1 < pending_end ? at + 1 : at;
+            const float left = static_cast<float>(pending[at * channels]) / 32768.0f;
+            const float right = channels > 1 ? static_cast<float>(pending[at * channels + 1]) / 32768.0f : left;
+            const float next_left = static_cast<float>(pending[next * channels]) / 32768.0f;
+            const float next_right =
+                channels > 1 ? static_cast<float>(pending[next * channels + 1]) / 32768.0f : next_left;
+            output[produced * 2] = left + (next_left - left) * static_cast<float>(fraction);
+            output[produced * 2 + 1] = right + (next_right - right) * static_cast<float>(fraction);
+            ++produced;
+            source_pos += ratio;
+        }
+        std::size_t offset = 0;
+        while (offset < produced && !task.stop.load() && !faded_out(task)) {
+            const std::size_t written = task.deck->write(output.data() + offset * 2, produced - offset);
+            offset += written;
+            task.position += written;
+            if (!written) {
+                if (task.paused.load()) break;
+                ps4::system::sleep_us(5000);
+            }
+        }
+        const std::uint64_t keep = static_cast<std::uint64_t>(std::floor(source_pos));
+        if (keep > pending_base && pending.size() / channels > 16384) {
+            const std::size_t drop = static_cast<std::size_t>(keep - pending_base);
+            pending.erase(pending.begin(), pending.begin() + drop * channels);
+            pending_base += drop;
+        }
+        return produced;
+    };
+
+    auto append = [&](const mp3d_sample_t* samples, std::size_t count) {
+        pending.insert(pending.end(), samples, samples + count);
+        drain(false);
+    };
+
+    if (task.remote) {
+        http = std::make_shared<HttpState>(owner);
+        start_http(http);
+        int error = 0;
+        while (!vorbis && !task.stop.load()) {
+            if (!eof) {
+                std::uint8_t chunk[16384];
+                const std::size_t got = http->ring.read(chunk, sizeof chunk, http->stop);
+                if (got) input.insert(input.end(), chunk, chunk + got);
+                else eof = true;
+            }
+            if (input.size() < 4) {
+                if (eof) break;
+                continue;
+            }
+            int consumed = 0;
+            vorbis = stb_vorbis_open_pushdata(input.data(), static_cast<int>(input.size()),
+                                              &consumed, &error, nullptr);
+            if (vorbis) {
+                input.erase(input.begin(), input.begin() + consumed);
+                break;
+            }
+            if (error != VORBIS_need_more_data) break;
+            if (eof) break;
+        }
+        if (!vorbis) {
+            http->stop = true;
+            http->ring.finish();
+            std::string message = "cannot decode the OGG";
+            if (http->failed.load()) {
+                std::lock_guard<std::mutex> lock(http->error_mutex);
+                if (!http->error.empty()) message = http->error;
+            }
+            set_error(task, message);
+            return;
+        }
+        const stb_vorbis_info info = stb_vorbis_get_info(vorbis);
+        hz = info.sample_rate;
+        channels = info.channels;
+        if (hz <= 0 || channels < 1) {
+            stb_vorbis_close(vorbis);
+            http->stop = true;
+            http->ring.finish();
+            set_error(task, "invalid OGG stream");
+            return;
+        }
+        ratio = static_cast<double>(hz) / 48000.0;
+        vorbis_metadata(vorbis, task);
+        ps4::system::log("music: %s %d Hz %d ch (stream)", task.source.c_str(), hz, channels);
+
+        while (!task.stop.load()) {
+            if (faded_out(task)) {
+                task.stop = true;
+                task.state = State::stopped;
+                break;
+            }
+            const std::uint64_t seek = task.seek_ms.exchange(kNoSeek);
+            if (seek != kNoSeek && !seek_warned) {
+                ps4::system::log("music: seek is not supported on HTTP streams");
+                seek_warned = true;
+            }
+            if (task.paused.load()) {
+                task.state = State::paused;
+                ps4::system::sleep_us(20000);
+                continue;
+            }
+            task.state = State::playing;
+            if (!eof) {
+                std::uint8_t chunk[16384];
+                const std::size_t got = http->ring.read(chunk, sizeof chunk, http->stop);
+                if (got) input.insert(input.end(), chunk, chunk + got);
+                else eof = true;
+            }
+
+            bool consumed = false;
+            while (input.size() >= 4) {
+                float** frame = nullptr;
+                int frame_channels = 0;
+                int samples = 0;
+                const int used = stb_vorbis_decode_frame_pushdata(
+                    vorbis, input.data(), static_cast<int>(input.size()), &frame_channels, &frame,
+                    &samples);
+                if (used > 0) {
+                    input.erase(input.begin(), input.begin() + used);
+                    consumed = true;
+                }
+                if (samples <= 0 || !frame) {
+                    if (used == 0) break;
+                    continue;
+                }
+                pcm.resize(static_cast<std::size_t>(samples) * frame_channels);
+                for (int i = 0; i < samples; ++i)
+                    for (int c = 0; c < frame_channels; ++c) {
+                        const float value = std::clamp(frame[c][i], -1.0f, 1.0f);
+                        pcm[static_cast<std::size_t>(i) * frame_channels + c] =
+                            static_cast<mp3d_sample_t>(value * 32767.0f);
+                    }
+                append(pcm.data(), pcm.size());
+            }
+            if (eof) {
+                drain(true);
+                break;
+            }
+            if (!consumed && input.size() > 256 * 1024) {
+                input.erase(input.begin(), input.begin() + 128 * 1024);
+                ps4::system::log("music: skipping unreadable OGG data");
+            }
+        }
+    } else {
+        int error = 0;
+        vorbis = stb_vorbis_open_filename(task.source.c_str(), &error, nullptr);
+        if (!vorbis) {
+            set_error(task, "cannot decode the OGG");
+            return;
+        }
+        const stb_vorbis_info info = stb_vorbis_get_info(vorbis);
+        hz = info.sample_rate;
+        channels = info.channels;
+        if (hz <= 0 || channels < 1) {
+            stb_vorbis_close(vorbis);
+            set_error(task, "invalid OGG stream");
+            return;
+        }
+        ratio = static_cast<double>(hz) / 48000.0;
+        const std::uint64_t source_frames = stb_vorbis_stream_length_in_samples(vorbis);
+        {
+            std::lock_guard<std::mutex> lock(task.info_mutex);
+            task.duration = source_frames ? static_cast<double>(source_frames) / hz : 0.0;
+        }
+        vorbis_metadata(vorbis, task);
+        ps4::system::log("music: %s %d Hz %d ch, %llu frames", task.source.c_str(), hz, channels,
+                         static_cast<unsigned long long>(source_frames));
+
+        while (!task.stop.load()) {
+            if (faded_out(task)) {
+                task.stop = true;
+                task.state = State::stopped;
+                break;
+            }
+            const std::uint64_t seek = task.seek_ms.exchange(kNoSeek);
+            if (seek != kNoSeek) {
+                std::uint64_t sample = seek * static_cast<std::uint64_t>(hz) / 1000;
+                if (source_frames && sample >= source_frames) sample = source_frames - 1;
+                if (stb_vorbis_seek(vorbis, static_cast<unsigned int>(sample))) {
+                    pending.clear();
+                    pending_base = sample;
+                    source_pos = static_cast<double>(sample);
+                    task.position = sample * 48000ull / static_cast<std::uint64_t>(hz);
+                } else {
+                    ps4::system::log("music: seek to %llu ms failed", static_cast<unsigned long long>(seek));
+                }
+            }
+            if (task.paused.load()) {
+                task.state = State::paused;
+                ps4::system::sleep_us(20000);
+                continue;
+            }
+            task.state = State::playing;
+            pcm.resize(static_cast<std::size_t>(4096) * channels);
+            const int got = stb_vorbis_get_samples_short_interleaved(
+                vorbis, channels, reinterpret_cast<short*>(pcm.data()),
+                static_cast<int>(pcm.size()));
+            if (got <= 0) {
+                drain(true);
+                break;
+            }
+            append(pcm.data(), static_cast<std::size_t>(got) * channels);
+        }
+    }
+
+    if (vorbis) stb_vorbis_close(vorbis);
+    if (http) {
+        http->stop = true;
+        http->ring.finish();
+    }
+    if (task.stop.load()) {
+        task.state = State::stopped;
+        return;
+    }
+    if (http && http->failed.load()) {
+        std::lock_guard<std::mutex> lock(http->error_mutex);
+        set_error(task, http->error.empty() ? "HTTP stream failed" : http->error);
+        return;
+    }
+    task.state = State::completed;
+    ps4::system::log("music: completed %s", task.source.c_str());
+}
+
 void run(const std::shared_ptr<Task>& owner) {
     owner->running = true;
-    if (owner->remote) run_remote(owner);
+    if (owner->vorbis) run_vorbis(owner);
+    else if (owner->remote) run_remote(owner);
     else run_local(owner);
     owner->running = false;
 }
@@ -778,10 +1072,12 @@ JSValue play(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (source.empty() || source.size() > 2048 || source.find('\0') != std::string::npos)
         return JS_ThrowTypeError(ctx, "Music.play: invalid path or URL");
     const bool remote = starts_with(source, "http://") || starts_with(source, "https://");
+    bool vorbis = vorbis_name(source);
     char path[PATH_MAX];
     if (!remote) {
         if (source.size() >= PATH_MAX || !host::resolve_path(source.c_str(), path, sizeof path))
             return JS_ThrowTypeError(ctx, "Music.play: path is not allowed");
+        if (!vorbis) vorbis = local_vorbis(path);
     }
     double volume = 1;
     if (argc > 1 && JS_ToFloat64(ctx, &volume, argv[1])) return JS_EXCEPTION;
@@ -791,6 +1087,7 @@ JSValue play(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     task->id = next_id++;
     task->source = remote ? source : path;
     task->remote = remote;
+    task->vorbis = vorbis;
     task->volume = static_cast<float>(volume);
 
     std::shared_ptr<Task> previous;

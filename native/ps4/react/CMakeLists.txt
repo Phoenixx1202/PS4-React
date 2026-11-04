@@ -68,6 +68,7 @@ add_executable(ps4_react_starter
     ../shared/app_state.cpp
     ../shared/text_shaper.cpp
     ../third_party/sheenbidi/Source/SheenBidi.c
+    ../third_party/stb_vorbis.c
     ../audio_out.cpp
     ../shared/js_heap.cpp
     ../display_video.cpp

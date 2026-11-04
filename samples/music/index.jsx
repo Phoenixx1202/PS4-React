@@ -4,9 +4,12 @@ import font from '../assets/Inter-Regular.ttf';
 import tick from './tick.wav';
 
 const HTTP_SOURCE = 'http://192.168.0.8:8010/music.mp3';
+const HTTP_OGG = 'http://192.168.0.8:8010/music.ogg';
 const TRACKS = [
   {label: 'Local MP3', path: '/data/pkg/music.mp3'},
-  {label: 'HTTP stream', path: HTTP_SOURCE},
+  {label: 'HTTP MP3', path: HTTP_SOURCE},
+  {label: 'Local OGG', path: '/data/pkg/music.ogg'},
+  {label: 'HTTP OGG', path: HTTP_OGG},
 ];
 
 function Button({label, onPress, disabled, autoFocus}) {
@@ -132,7 +135,7 @@ function App() {
           <Button label={`Volume: ${volume.toFixed(2)}`} onPress={changeVolume} />
         </View>
         <Text style={{fontFamily: font, fontSize: 21, color: '#5c6b78'}}>
-          {`Serve the MP3 at ${HTTP_SOURCE} or edit HTTP_SOURCE. Imported tick: ${tick}`}
+          {`Serve the MP3/OGG at ${HTTP_SOURCE} and ${HTTP_OGG}, or edit the sources. Imported tick: ${tick}`}
         </Text>
       </View>
     </FocusScope>

@@ -31,8 +31,9 @@ The default build produces a single installable package:
 - **Payload delivery** to GoldHEN's BinLoader with ELF and size checks.
 - **Server-Sent Events** through `Sse.connect` with bounded event queues.
 - **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
-- **Music** playback: MP3 decoding, 48 kHz resampling and the mixer's music
-  deck (local files; HTTP streaming is pending).
+- **Music** playback: MP3 and OGG Vorbis decoding, 48 kHz resampling, local
+  files and HTTP(S) streams, ID3/Vorbis metadata, playlists and crossfade on
+  the mixer's two music decks.
 - **Video** playback through `sceAvPlayer` (local MP4/H.264 + AAC, NV12 with
   pitch/crop, ARGB blit at 30 fps for 480p, audio through the mixer on a
   dedicated thread). 720p/1080p and the GPU texture path are pending.
@@ -192,7 +193,7 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `Payloads` | Check GoldHEN BinLoader and send an ELF payload to 127.0.0.1:9090 |
 | `Sse` | Server-Sent Events stream with event polling and cancellation |
 | `WebSocket` | ws/wss text client with polling, ping/pong and close |
-| `Music` | Local MP3 playback with pause/resume/stop and volume |
+| `Music` | Local and HTTP(S) MP3/OGG playback, seek (local), metadata, playlists and crossfade |
 | `Video` | Local MP4/H.264 playback through `sceAvPlayer`; pause/resume/seek/stop |
 | `SaveData` | Mount, unmount and delete PS4 save data; `repairBroken` recovers a broken directory |
 | `Keyboard.prompt` | Open the system on-screen keyboard |
@@ -200,9 +201,10 @@ JavaScript reaches the host through `@ps4-react/core`.
 | `AppState` | App lifecycle state and system events (resume, URL open, focus) |
 | `Fonts` / `BackHandler` / `Power` / `Linking` | Text language, exit, keep-awake and URLs |
 
-`BrowserCapture` is not part of the PS4 runtime. Music streaming is not
-implemented yet. Video currently targets 480p with CPU NV12 conversion;
-720p/1080p and the GPU texture path are pending.
+`BrowserCapture` is not part of the PS4 runtime. Opus, album art and system BGM
+are pending. Video currently targets 480p on the software path; the Vulkan
+build can present the UI and video frames through Y/UV textures, while
+720p/1080p decoding and HDR remain pending.
 
 Save data and the system keyboard are available from the same import:
 
@@ -268,10 +270,12 @@ Validated on PS4 hardware:
 Known limitations:
 
 - RAR/RAR5 extraction is not available yet; ZIP/TAR/7z are supported.
-- Music streaming is not implemented yet.
-- Video playback uses the software decoder and CPU NV12 conversion (480p30 on
-  hardware); AAC audio, 720p/1080p and GPU YUV are pending. Video apps close
-  through `sceSystemServiceLoadExec("exit", nullptr)` because `KillApp`'s
+- Opus, album art and system BGM are not implemented yet.
+- Video playback uses the software decoder and CPU NV12 conversion on the
+  default build (480p30). The Vulkan build uploads Y/UV textures instead; AAC
+  audio is validated, while 720p/1080p and hardware decoding are pending. Video
+  apps close through `sceSystemServiceLoadExec("exit", nullptr)` because
+  `KillApp`'s
   suspend waits for a decoder GPU submit that never completes.
 - `Packages` requires an app packaged with `"privileged": true`; it loads the
   internal AppInstUtil/BGFT sysmodules and installs through BGFT. Validated on

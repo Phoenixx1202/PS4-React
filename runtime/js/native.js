@@ -199,10 +199,10 @@ export const Sound = {
 };
 
 /**
- * MP3 music on the mixer's music deck. `play` decodes a local file or an
- * HTTP(S) URL on a worker thread, resamples it to 48 kHz and fills the stream
- * ring; pause/resume/stop control the deck and `seek` works on local files.
- * The app needs at least one baked sound to open the audio output.
+ * MP3 and OGG Vorbis music on the mixer's music decks. `play` decodes a local
+ * file or an HTTP(S) URL on a worker thread, resamples it to 48 kHz and fills
+ * the stream ring; pause/resume/stop control the deck and `seek` works on local
+ * files. The app needs at least one baked sound to open the audio output.
  */
 export const Music = Object.freeze({
   /** @param {{path: string, volume?: number}} options */
