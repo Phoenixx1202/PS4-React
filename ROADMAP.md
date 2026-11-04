@@ -191,8 +191,10 @@ Validado no hardware; o log recomeça do zero após o relaunch.
   `750d1ab986fdcafb96f633323057dff2d399693f2dd4f7d73a4d75e3b1182b2e`);
 - [x] `device` (DeviceInfo/Users/Notifications) — validado, incluindo
   temperatura via `libkernel_sys` e memória flexível disponível;
-- [ ] `gallery` (imagens + ScrollView)
-- [ ] `list` (VirtualList com centenas de linhas)
+- [x] `gallery` (imagens + ScrollView) — 9 PNGs empacotados, grid de 3
+  colunas e scroll pelo foco; validado no hardware;
+- [x] `list` (VirtualList com centenas de linhas) — 1000 linhas, janela ao
+  redor do viewport e scroll pelo foco; validado no hardware.
 
 ## Fase 2 — Mídia (P1)
 
@@ -576,6 +578,13 @@ firmware/GoldHEN:
   (o mutagen grava em minúsculas). O `music.ogg` de teste ganhou capa e
   TITLE/ARTIST/ALBUM; local e HTTP exibem a mesma arte do MP3. Opus e BGM do
   sistema pendentes. Sem push.
+- 2026-11-03 - samples `gallery` e `list` validados no hardware: gallery com 9
+  PNGs de 640×360 empacotados (PKG
+  `2af34767fc7315e878e35ac8d2d760bbf4847157d879e916563a3cfc2f49d2aa`,
+  CUSA99081), grid de 3 colunas, foco e `ScrollView`; list com `VirtualList`
+  de 1000 linhas (PKG
+  `7686c3d0eb2676eedd9ed427d4700bf6923a94817f196c3389dbfe08ff658828`,
+  CUSA99082), janela de montagem e scroll pelo foco. Ambos a 59,9 fps. Sem push.
 ```
 
 ## Changelog do plano

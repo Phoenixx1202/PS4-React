@@ -24,6 +24,9 @@ Small React apps that exercise the native APIs. Each sample has its own
 .\tools\build_ps4.ps1 -Sample controllers
 .\tools\build_ps4.ps1 -Sample music
 .\tools\build_ps4.ps1 -Sample video
+.\tools\build_ps4.ps1 -Sample text
+.\tools\build_ps4.ps1 -Sample gallery
+.\tools\build_ps4.ps1 -Sample list
 .\tools\build_ps4.ps1 -Sample gpu
 ```
 
@@ -68,8 +71,11 @@ The default build still packages `app/` as `PS4-React-Starter.pkg`:
 | `sse` | Server-Sent Events stream with event polling |
 | `websocket` | ws/wss text messages, echo server and polling |
 | `controllers` | Four player panels with `useGamepad(playerIndex)` |
-| `music` | Local MP3 playback with the mixer music deck |
+| `music` | MP3 and OGG Vorbis from local files or HTTP(S), metadata, album art, playlist and crossfade |
 | `video` | Local MP4/H.264 playback through `sceAvPlayer` with pause/resume/seek/stop; put the file at `/data/pkg/sample.mp4` |
+| `text` | Japanese, Chinese, Arabic, Hindi and Bengali with subset Noto fonts in `fonts/` |
+| `gallery` | Nine bundled PNGs in a focusable 3-column `ScrollView` grid |
+| `list` | `VirtualList` with 1000 rows, focus scrolling and a windowed mount range |
 | `gpu` | Piglet/OpenGL ES presentation with software fallback |
 
 All samples share `samples/assets/Inter-Regular.ttf`; the bundler bakes only the
@@ -80,13 +86,9 @@ of the PKGs to a release when a `v*` tag is pushed.
 
 ## More ideas
 
-- `audio`: buttons that call `Sound.play` with the bundled WAVs.
-- `downloads`: `Downloads.enqueue` progress, cancel and resume.
-- `archive`: extract a small ZIP from `/app0` into `/download0`.
-- `text`: CJK/Arabic strings with Noto fonts in `app/fonts`.
-- `device`: `DeviceInfo`, `Users` and `Notifications`.
-- `gallery`: a grid of remote images backed by `ScrollView`.
-- `list`: `VirtualList` with a few hundred rows to test scrolling and focus.
+- `camera`: `sceCamera` preview and capture with permission and no-device states.
+- `browser`: a remote browser capture over HTTP frames and input.
+- `rar`: RAR5 extraction once the decoder and license are chosen.
 
 Samples are standalone: copy one to `app/` if you want to use it as the default
 build, or add new folders under `samples/` and run `-Sample <name>`.
