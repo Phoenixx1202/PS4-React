@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {AppRegistry, View, Text, FocusScope, Music} from '@ps4-react/core';
+import {AppRegistry, View, Text, Image, FocusScope, Music} from '@ps4-react/core';
 import font from '../assets/Inter-Regular.ttf';
 import tick from './tick.wav';
 
@@ -40,7 +40,7 @@ function App() {
   const [track, setTrack] = useState(null);
   const [index, setIndex] = useState(0);
   const [status, setStatus] = useState({
-    state: 'idle', position: 0, duration: 0, error: '', seekable: true,
+    state: 'idle', position: 0, duration: 0, error: '', seekable: true, cover: '',
   });
   const [volume, setVolume] = useState(1);
   const trackRef = useRef(null);
@@ -56,7 +56,7 @@ function App() {
       setTrack(next);
       setIndex(nextIndex);
       setStatus({
-        state: 'playing', position: 0, duration: 0, error: '', seekable: true,
+        state: 'playing', position: 0, duration: 0, error: '', seekable: true, cover: '',
       });
     } catch (error) {
       setTrack(null);
@@ -109,13 +109,32 @@ function App() {
         width: 1920, height: 1080, backgroundColor: '#101820',
         alignItems: 'center', justifyContent: 'center', gap: 20,
       }}>
-        <Text style={{fontFamily: font, fontSize: 66, color: '#ffffff'}}>
-          PS4 React Music
-        </Text>
-        <Text style={{fontFamily: font, fontSize: 34, color: '#cfe0ff'}}>{title}</Text>
-        <Text style={{fontFamily: font, fontSize: 26, color: '#8fa6b8'}}>
-          {`${artist}  |  ${status.album || 'no album'}`}
-        </Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 34}}>
+          {status.cover ? (
+            <Image
+              source={status.cover}
+              resizeMode="cover"
+              style={{width: 220, height: 220, borderRadius: 14}}
+            />
+          ) : (
+            <View style={{
+              width: 220, height: 220, borderRadius: 14,
+              backgroundColor: '#182630', borderWidth: 2, borderColor: '#314451',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Text style={{fontFamily: font, fontSize: 22, color: '#5c6b78'}}>No cover</Text>
+            </View>
+          )}
+          <View style={{gap: 10}}>
+            <Text style={{fontFamily: font, fontSize: 62, color: '#ffffff'}}>
+              PS4 React Music
+            </Text>
+            <Text style={{fontFamily: font, fontSize: 34, color: '#cfe0ff'}}>{title}</Text>
+            <Text style={{fontFamily: font, fontSize: 26, color: '#8fa6b8'}}>
+              {`${artist}  |  ${status.album || 'no album'}`}
+            </Text>
+          </View>
+        </View>
         <Text style={{fontFamily: font, fontSize: 28, color: '#a0c4ff'}}>
           {`${status.state}  |  ${clock(status.position)} / ${clock(status.duration)}  |  ${entry.path}`}
         </Text>

@@ -20,6 +20,16 @@
 #include "stb_vorbis.c"
 #undef STB_VORBIS_HEADER_ONLY
 
+#define STB_IMAGE_STATIC
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_PNG
+#include "stb_image.h"
+
+extern "C" {
+#include "er_scene.h"
+}
+
 #include <curl/curl.h>
 #include <pthread.h>
 
@@ -73,6 +83,10 @@ struct Task {
     std::mutex info_mutex;
     double duration = 0;
     Metadata metadata;
+    std::vector<std::uint8_t> cover;
+    std::vector<std::uint32_t> cover_pixels;
+    std::string cover_name;
+    bool cover_failed = false;
     std::string error;
 };
 
@@ -278,7 +292,8 @@ std::string decode_id3_text(const std::uint8_t* data, std::size_t size) {
     return out;
 }
 
-bool parse_id3v2(const std::uint8_t* data, std::size_t size, Metadata& metadata) {
+bool parse_id3v2(const std::uint8_t* data, std::size_t size, Metadata& metadata,
+                 std::vector<std::uint8_t>* cover = nullptr) {
     if (size < 10 || std::memcmp(data, "ID3", 3) != 0) return false;
     const int version = data[3];
     if (version < 2 || version > 4) return false;
@@ -296,6 +311,27 @@ bool parse_id3v2(const std::uint8_t* data, std::size_t size, Metadata& metadata)
         if (std::strcmp(id, "TIT2") == 0) metadata.title = decode_id3_text(body, frame_size);
         else if (std::strcmp(id, "TPE1") == 0) metadata.artist = decode_id3_text(body, frame_size);
         else if (std::strcmp(id, "TALB") == 0) metadata.album = decode_id3_text(body, frame_size);
+        else if (std::strcmp(id, "APIC") == 0 && cover && cover->empty()) {
+            const std::uint8_t* at_picture = body;
+            const std::uint8_t* end_picture = body + frame_size;
+            if (at_picture < end_picture) {
+                const std::uint8_t encoding = *at_picture++;
+                while (at_picture < end_picture && *at_picture) ++at_picture;
+                if (at_picture < end_picture) ++at_picture;
+                if (at_picture < end_picture) ++at_picture;
+                if (encoding == 1 || encoding == 2) {
+                    while (at_picture + 1 < end_picture &&
+                           !(at_picture[0] == 0 && at_picture[1] == 0))
+                        at_picture += 2;
+                    if (at_picture + 1 < end_picture) at_picture += 2;
+                } else {
+                    while (at_picture < end_picture && *at_picture) ++at_picture;
+                    if (at_picture < end_picture) ++at_picture;
+                }
+                if (at_picture < end_picture)
+                    cover->assign(at_picture, end_picture);
+            }
+        }
         at += 10 + frame_size;
     }
     return true;
@@ -320,7 +356,14 @@ void read_local_metadata(Task& task) {
             std::memcpy(tag.data(), header, 10);
             if (std::fread(tag.data() + 10, 1, tag_size, file) == tag_size) {
                 Metadata metadata;
-                if (parse_id3v2(tag.data(), tag.size(), metadata)) set_metadata(task, metadata);
+                std::vector<std::uint8_t> cover;
+                if (parse_id3v2(tag.data(), tag.size(), metadata, &cover)) {
+                    set_metadata(task, metadata);
+                    if (!cover.empty()) {
+                        std::lock_guard<std::mutex> lock(task.info_mutex);
+                        task.cover = std::move(cover);
+                    }
+                }
             }
         }
     }
@@ -366,6 +409,57 @@ void vorbis_metadata(stb_vorbis* vorbis, Task& task) {
         set_metadata(task, metadata);
 }
 
+std::string ensure_cover(Task& task) {
+    std::lock_guard<std::mutex> lock(task.info_mutex);
+    if (!task.cover_name.empty()) return task.cover_name;
+    if (task.cover.empty() || task.cover_failed) return {};
+    int width = 0, height = 0, components = 0;
+    unsigned char* source = stbi_load_from_memory(
+        task.cover.data(), static_cast<int>(task.cover.size()), &width, &height, &components, 4);
+    if (!source || width <= 0 || height <= 0 ||
+        static_cast<std::uint64_t>(width) * height > 5000000) {
+        if (source) stbi_image_free(source);
+        task.cover_failed = true;
+        return {};
+    }
+    task.cover_pixels.resize(static_cast<std::size_t>(width) * height);
+    bool opaque = true;
+    for (std::size_t i = 0; i < task.cover_pixels.size(); ++i) {
+        const unsigned a = source[i * 4 + 3];
+        if (a != 255) opaque = false;
+        const unsigned r = source[i * 4 + 0] * a / 255;
+        const unsigned g = source[i * 4 + 1] * a / 255;
+        const unsigned b = source[i * 4 + 2] * a / 255;
+        task.cover_pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
+    }
+    stbi_image_free(source);
+    char name[24];
+    std::snprintf(name, sizeof name, "@music:%u", task.id);
+    if (!er_image_load_argb(name, task.cover_pixels.data(), width, height, opaque)) {
+        task.cover_pixels.clear();
+        task.cover_failed = true;
+        return {};
+    }
+    task.cover_name = name;
+    return task.cover_name;
+}
+
+void drop_cover(Task& task) {
+    std::string name;
+    {
+        std::lock_guard<std::mutex> lock(task.info_mutex);
+        name = task.cover_name;
+        task.cover_name.clear();
+        task.cover.clear();
+        task.cover_failed = true;
+    }
+    if (!name.empty()) er_image_unload(name.c_str());
+    {
+        std::lock_guard<std::mutex> lock(task.info_mutex);
+        task.cover_pixels.clear();
+    }
+}
+
 void update_http_metadata(HttpState& http) {
     std::lock_guard<std::mutex> lock(http.prefix_mutex);
     if (http.prefix_done) return;
@@ -383,8 +477,14 @@ void update_http_metadata(HttpState& http) {
     }
     if (http.prefix.size() < static_cast<std::size_t>(tag_size) + 10) return;
     Metadata metadata;
-    if (parse_id3v2(http.prefix.data(), http.prefix.size(), metadata))
+    std::vector<std::uint8_t> cover;
+    if (parse_id3v2(http.prefix.data(), http.prefix.size(), metadata, &cover)) {
         set_metadata(*http.task, metadata);
+        if (!cover.empty()) {
+            std::lock_guard<std::mutex> lock(http.task->info_mutex);
+            http.task->cover = std::move(cover);
+        }
+    }
     http.prefix_done = true;
     http.prefix.clear();
 }
@@ -1099,7 +1199,11 @@ JSValue play(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
         task->slot = slot;
         task->deck = slot == 0 ? &deck_a : &deck_b;
         tasks.push_back(task);
-        if (tasks.size() > 8) tasks.erase(tasks.begin());
+        if (tasks.size() > 8) {
+            auto old = tasks.front();
+            tasks.erase(tasks.begin());
+            drop_cover(*old);
+        }
         current = task;
     }
 
@@ -1226,11 +1330,13 @@ JSValue status(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     JS_SetPropertyStr(ctx, out, "state", JS_NewString(ctx, state_name(task->state)));
     JS_SetPropertyStr(ctx, out, "position", JS_NewFloat64(ctx, task->position / 48000.0));
     JS_SetPropertyStr(ctx, out, "seekable", JS_NewBool(ctx, !task->remote));
+    const std::string cover = ensure_cover(*task);
     std::lock_guard<std::mutex> lock(task->info_mutex);
     JS_SetPropertyStr(ctx, out, "duration", JS_NewFloat64(ctx, task->duration));
     JS_SetPropertyStr(ctx, out, "title", JS_NewString(ctx, task->metadata.title.c_str()));
     JS_SetPropertyStr(ctx, out, "artist", JS_NewString(ctx, task->metadata.artist.c_str()));
     JS_SetPropertyStr(ctx, out, "album", JS_NewString(ctx, task->metadata.album.c_str()));
+    JS_SetPropertyStr(ctx, out, "cover", JS_NewString(ctx, cover.c_str()));
     JS_SetPropertyStr(ctx, out, "error", JS_NewString(ctx, task->error.c_str()));
     return out;
 }

@@ -205,8 +205,9 @@ Validado no hardware; o log recomeça do zero após o relaunch.
   a faixa inteira) e validada no hardware. `seek` funciona em arquivo local
   MP3/OGG; stream HTTP ainda não aceita seek;
 - [x] playlists no sample (`Previous`/`Next`/auto-avanço) e metadados ID3
-  (`title`/`artist`/`album`) no status; capa ainda pendente. Crossfade de 1,5 s
-  com dois decks de música e o terceiro stream do mixer validado no hardware;
+  (`title`/`artist`/`album`) no status; capa de álbum MP3 (APIC) decodificada,
+  registrada no engine e exibida no sample. Capa em OGG (`METADATA_BLOCK_PICTURE`)
+  ainda pendente; crossfade de 1,5 s com dois decks validado no hardware;
 - [x] crossfade usando os dois decks e o `stream_ring` do mixer: música A no
   stream 0, áudio de vídeo no 1 e música B no 2; a playlist inicia a próxima
   faixa antes do fim do arquivo local e troca manual também sobrepõe;
@@ -561,6 +562,12 @@ firmware/GoldHEN:
   seek local e crossfade. A duração do MP3 local foi corrigida (estava contando
   samples intercalados; agora ~6:12 como o OGG). Opus, capa e BGM pendentes.
   Sem push.
+- 2026-11-03 - capa de álbum MP3 validada no hardware (sample music, PKG
+  `b1e8db1fe204c6650a9caf5870112368b59af5280956ba871cf1a032c342ad6d`): o frame
+  APIC do ID3 é extraído, decodificado com stb_image, premultiplicado e
+  registrado no engine como `@music:<id>`; o `<Image source={cover}>` do sample
+  exibe a capa 220×220. O `music.mp3` de teste ganhou TIT2/TALB e uma capa
+  320×320. Capa em OGG, Opus e BGM do sistema pendentes. Sem push.
 ```
 
 ## Changelog do plano
