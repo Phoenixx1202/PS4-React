@@ -267,6 +267,8 @@ bool start_attempted_ = false;
 std::uint64_t start_wait_us_ = 0;
 bool video_used_ = false;
 Rect rect_{0, 0, 1920, 1080};
+bool gpu_present_ = false;
+ps4::VideoFrameView frame_view_{};
 std::atomic<int> event_code_{-1};
 std::atomic<bool> ready_event_{false};
 std::atomic<int> allocation_logs_{0};
@@ -461,6 +463,7 @@ void reset_state() {
     last_height_ = 0;
     start_attempted_ = false;
     start_wait_us_ = 0;
+    frame_view_ = {};
     event_code_.store(-1);
     ready_event_.store(false);
     path_.clear();
@@ -786,10 +789,26 @@ void ps4_react_video_pump() {
             const std::uint8_t* staged =
                 stage_frame(frame.p_data, pitch, static_cast<int>(video.height));
             if (staged) {
-                blit_nv12(staged, static_cast<int>(video.width), static_cast<int>(video.height),
-                          pitch, visible_width, visible_height,
-                          static_cast<int>(video.crop_left_offset),
-                          static_cast<int>(video.crop_top_offset));
+                frame_view_.data = staged;
+                frame_view_.serial = frames_;
+                frame_view_.source_width = static_cast<int>(video.width);
+                frame_view_.source_height = static_cast<int>(video.height);
+                frame_view_.pitch = pitch;
+                frame_view_.visible_width = visible_width;
+                frame_view_.visible_height = visible_height;
+                frame_view_.crop_left = static_cast<int>(video.crop_left_offset);
+                frame_view_.crop_top = static_cast<int>(video.crop_top_offset);
+                frame_view_.rect_x = rect_.x;
+                frame_view_.rect_y = rect_.y;
+                frame_view_.rect_width = rect_.width;
+                frame_view_.rect_height = rect_.height;
+                frame_view_.full_range = video.video_full_range_flag;
+                if (!gpu_present_) {
+                    blit_nv12(staged, static_cast<int>(video.width),
+                              static_cast<int>(video.height), pitch, visible_width,
+                              visible_height, static_cast<int>(video.crop_left_offset),
+                              static_cast<int>(video.crop_top_offset));
+                }
             }
         }
         return;
@@ -812,9 +831,25 @@ void ps4_react_video_pump() {
         const std::uint8_t* staged = stage_frame(frame.p_data, static_cast<int>(width),
                                                  static_cast<int>(height));
         if (staged) {
-            blit_nv12(staged, static_cast<int>(width), static_cast<int>(height),
-                      static_cast<int>(width), static_cast<int>(width),
-                      static_cast<int>(height), 0, 0);
+            frame_view_.data = staged;
+            frame_view_.serial = frames_;
+            frame_view_.source_width = static_cast<int>(width);
+            frame_view_.source_height = static_cast<int>(height);
+            frame_view_.pitch = static_cast<int>(width);
+            frame_view_.visible_width = static_cast<int>(width);
+            frame_view_.visible_height = static_cast<int>(height);
+            frame_view_.crop_left = 0;
+            frame_view_.crop_top = 0;
+            frame_view_.rect_x = rect_.x;
+            frame_view_.rect_y = rect_.y;
+            frame_view_.rect_width = rect_.width;
+            frame_view_.rect_height = rect_.height;
+            frame_view_.full_range = false;
+            if (!gpu_present_) {
+                blit_nv12(staged, static_cast<int>(width), static_cast<int>(height),
+                          static_cast<int>(width), static_cast<int>(width),
+                          static_cast<int>(height), 0, 0);
+            }
         }
     }
 }
@@ -825,6 +860,16 @@ void ps4_react_video_stop() {
 
 bool ps4_react_video_used() {
     return video_used_;
+}
+
+bool ps4_react_video_frame_view(ps4::VideoFrameView* view) {
+    if (!view || !frame_view_.data) return false;
+    *view = frame_view_;
+    return true;
+}
+
+void ps4_react_video_set_gpu_present(bool enabled) {
+    gpu_present_ = enabled;
 }
 
 void ps4_react_video_attach(hui::audio::Mixer& target) {

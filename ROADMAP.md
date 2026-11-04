@@ -215,16 +215,20 @@ CPU baixa. MP3 local validado; stream HTTP, OGG/Opus e crossfade pendentes.
   handshake `sceSystemServiceLoadExec("exit", nullptr)`;
 - [x] áudio AAC: `sceAvPlayerGetAudioData` (mono S16 48 kHz) convertido para o
   mixer em um thread dedicado, com resample linear; pause/resume acompanham o
-  áudio. Qualidade contínua (sem picotes) ainda a confirmar no hardware;
-- [ ] 720p/1080p: o custo atual é a conversão NV12→ARGB na CPU; o decoder de
-  hardware exige `libSceGnmDriver` e não pode fechar por `KillApp` (suspend
-  timeout), por isso a saída usa o handshake `LoadExec("exit")`;
-- [ ] caminho de textura GPU/YUV (evita a conversão CPU e o custo de ler
-  WC_GARLIC);
+  áudio. Validado no hardware no sample 480p;
+- [ ] 720p/1080p: o caminho Vulkan já entrega os frames como texturas Y/UV sem
+  conversão na CPU, então o custo restante é o decoder de hardware, que exige
+  `libSceGnmDriver` e não pode fechar por `KillApp` (suspend timeout); a saída
+  continua usando o handshake `LoadExec("exit")`;
+- [x] caminho de textura GPU/YUV (evita a conversão CPU e o custo de ler
+  WC_GARLIC): texturas `R8`/`R8G8`, upload apenas em frame novo e composição no
+  fragment shader do Vulkan com o mesmo letterbox do caminho software; validado
+  no hardware com o sample 480p (cores, posição, pause/seek/stop e saída limpa);
 - [x] sample `video`.
 
 **Aceite:** MP4 H.264 1080p com áudio sincronizado, seek e sem leak. 480p
-software validado; 720p/1080p, áudio e GPU pendentes.
+validado nos caminhos software e GPU/YUV; 720p/1080p e decoder de hardware
+pendentes.
 
 ### 2.3 Imagens
 
@@ -286,6 +290,11 @@ silenciosa. Validado no hardware; a auditoria formal fica pendente.
 - [x] abstração `Renderer` com implementação software e apresentação GPU
   (Piglet/EGL) opt-in por `"gpu": true`, com fallback software; validada no
   hardware com shaders pré-compilados da Sony (`texmap`);
+- [x] runtime React completo (engine, QuickJS, bridge e APIs nativas) no
+  toolchain PS4SX2 (clang-21/libc++21 + Mesa/RADV), com a UI apresentada por
+  textura Vulkan 1080p em dois buffers de scanout alternados; validado no
+  hardware com 2256 frames a 59,9 fps e sem falhas de `present`. O shaper de
+  texto desse build ainda é um stub (latim funciona pelas fontes baked);
 - [ ] atlas de textura, batching, scissor, blend e shaders para a UI 2D;
   bloqueado com os shaders pré-compilados da Sony: `texmap/v_0`, `v_1` e `v_2`
   derivam a UV da posição do vértice via `u_textureSpaceMatrix`, então cada

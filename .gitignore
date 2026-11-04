@@ -8,3 +8,4 @@ samples-pkg/
 *.self
 *.pkg
 logs/
+native/ps4/shaders/*.spv

@@ -103,6 +103,8 @@ extern "C" {
 #include "quickjs.h"
 }
 
+#include "video_view.hpp"
+
 constexpr std::size_t kMaxReadBytes = 8 * 1024 * 1024;
 
 // Shared (host_api.cpp).

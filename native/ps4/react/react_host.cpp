@@ -24,6 +24,9 @@
 #if PS4_REACT_GPU
 #include "gpu_display.hpp"
 #endif
+#if PS4_REACT_VULKAN
+#include "vulkan_display.hpp"
+#endif
 
 extern "C" {
 #include "assets.generated.h"
@@ -166,11 +169,21 @@ int main() {
 #else
     constexpr bool have_gpu = false;
 #endif
-    if (!have_gpu && !display.open(kWidth, kHeight)) {
+#if PS4_REACT_VULKAN
+    const bool have_vulkan = ps4::vulkan_display_open(kWidth, kHeight);
+    ps4::system::log("PS4 React Starter: vulkan=%s", have_vulkan ? "yes" : "no");
+#else
+    constexpr bool have_vulkan = false;
+#endif
+    if (!have_gpu && !have_vulkan && !display.open(kWidth, kHeight)) {
         ps4::system::log("PS4 React Starter: display open failed");
         ps4::system::park();
     }
+    ps4_react_video_set_gpu_present(have_vulkan);
     const auto present = [&](const std::uint32_t* pixels) -> bool {
+#if PS4_REACT_VULKAN
+        if (have_vulkan) return ps4::vulkan_display_present(pixels);
+#endif
 #if PS4_REACT_GPU
         if (have_gpu) return gpu.present(pixels);
 #endif
@@ -368,6 +381,9 @@ int main() {
 
     ps4::system::log("PS4 React Starter: loop ended after %u frames", total_frames);
 
+#if PS4_REACT_VULKAN
+    if (have_vulkan) ps4::vulkan_display_close();
+#endif
     // Stop the AvPlayer threads and unload its modules before KillApp's suspend.
     ps4_react_video_shutdown();
     ps4::system::sleep_us(150000);
