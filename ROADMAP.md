@@ -199,15 +199,19 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 ### 2.1 Música e streaming
 
 - [x] decoder MP3 (minimp3) com resample para 48 kHz; OGG/Opus pendentes;
-- [ ] `Music.play(file|url)`, pause/resume/seek/volume: arquivo local,
-  pause/resume/volume e stop validados; URL/streaming e seek pendentes;
-- [ ] playlists, crossfade e metadados (título/artista/capa);
-- [ ] usar os dois decks e o `stream_ring` existentes no mixer (um deck usado);
+- [x] `Music.play(file|url)`, pause/resume/stop/volume: arquivo local validado;
+  URL HTTP(S) decodificada em fluxo com ring buffer de 1 MiB (sem baixar a
+  faixa inteira) e validada no hardware. `seek` funciona em arquivo local;
+  stream HTTP ainda não aceita seek;
+- [x] playlists no sample (`Previous`/`Next`/auto-avanço) e metadados ID3
+  (`title`/`artist`/`album`) no status; capa ainda pendente. Crossfade com os
+  dois decks e BGM do sistema continuam pendentes;
+- [ ] crossfade usando os dois decks e o `stream_ring` do mixer;
 - [ ] BGM do sistema (`sceMusicPlayerService`) quando disponível;
-- [x] sample `music` (MP3 local validado no hardware).
+- [x] sample `music` (MP3 local e HTTP validados no hardware).
 
 **Aceite:** tocar MP3 local e stream HTTP com crossfade, sem underrun e com
-CPU baixa. MP3 local validado; stream HTTP, OGG/Opus e crossfade pendentes.
+CPU baixa. MP3 local e stream HTTP validados; OGG/Opus e crossfade pendentes.
 
 ### 2.2 Vídeo
 
@@ -528,6 +532,15 @@ firmware/GoldHEN:
   O limite de 255 bytes por nó cortava o parágrafo; o patch
   `patches/embeddedReact-text-size.patch` eleva para 1023 bytes (768 bytes por
   nó, ~0,4 MB com `ER_MAX_NODES=512`). Sem push.
+- 2026-11-03 - música HTTP validada no hardware (sample music, PKG
+  `87dca4b5aeb7bb657c91a6ec3bf9039de3a434aaa58a1bbb236d9daa736f1c39`): o
+  walkthrough `Music.play(url)` usa `mp3dec_decode_frame` sobre um ring buffer
+  de 1 MiB preenchido por curl, sem baixar a faixa inteira; log
+  `music: http://192.168.0.8:8010/music.mp3 44100 Hz 2 ch (stream)` e o servidor
+  registrou os GETs. `seek` fica restrito ao arquivo local, pois
+  `mp3dec_ex_open_cb` exige fonte seekable e varre o stream. Metadados ID3
+  (`SoundHelix`) e playlist com Previous/Next/auto-avanço no sample. Crossfade,
+  OGG/Opus, capa e BGM do sistema pendentes. Sem push.
 ```
 
 ## Changelog do plano

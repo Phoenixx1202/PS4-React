@@ -1,22 +1,34 @@
 // Copyright (C) 2026 half144 and PS5 React contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Additional attribution term: see LICENSE-ATTRIBUTION.
+//
+// MP3 music on the mixer's music deck. Local files and HTTP(S) URLs are
+// decoded incrementally with minimp3_ex; a worker thread resamples to 48 kHz
+// and fills the stream ring. HTTP bodies are fed through a bounded byte ring
+// so the decoder waits for the network without downloading the whole track.
+
 #include "host_api.hpp"
 
 #include "audio/mixer.hpp"
+#include "network.hpp"
 #include "system.hpp"
 
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3_ex.h"
 
+#include <curl/curl.h>
 #include <pthread.h>
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -24,23 +36,117 @@
 
 namespace {
 
+constexpr std::uint64_t kNoSeek = std::numeric_limits<std::uint64_t>::max();
+constexpr std::size_t kHttpRingBytes = 1u << 20;
+constexpr std::size_t kMetadataPrefixBytes = 512u << 10;
+constexpr std::size_t kOutputFrames = 2048;
+
 enum class State : int { playing, paused, completed, failed, stopped };
+
+struct Metadata {
+    std::string title;
+    std::string artist;
+    std::string album;
+};
 
 struct Task {
     std::uint32_t id = 0;
-    std::string path;
+    std::string source;
+    bool remote = false;
     std::atomic<State> state{State::playing};
     std::atomic<bool> stop{false};
     std::atomic<bool> paused{false};
-    std::atomic<std::uint64_t> position{0};
-    std::uint64_t duration = 0;
+    std::atomic<bool> running{false};
+    std::atomic<std::uint64_t> position{0};  // output frames at 48 kHz
+    std::atomic<std::uint64_t> seek_ms{kNoSeek};
+    std::mutex info_mutex;
+    double duration = 0;
+    Metadata metadata;
+    std::string error;
+};
+
+// Bounded SPSC byte queue between the HTTP worker and the decoder. The writer
+// blocks when full and the reader blocks when empty, so a fast network cannot
+// grow memory without bound.
+class ByteRing {
+public:
+    explicit ByteRing(std::size_t capacity) : data_(capacity) {}
+
+    bool write(const std::uint8_t* source, std::size_t size, const std::atomic<bool>& stop) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (size > 0) {
+            cv_.wait_for(lock, std::chrono::milliseconds(20), [&] {
+                return used_ < data_.size() || eof_ || stop.load();
+            });
+            if (stop.load() || eof_) return false;
+            const std::size_t free = data_.size() - used_;
+            if (free == 0) continue;
+            const std::size_t chunk = std::min(size, free);
+            const std::size_t first = std::min(chunk, data_.size() - head_);
+            std::memcpy(data_.data() + head_, source, first);
+            if (chunk > first) std::memcpy(data_.data(), source + first, chunk - first);
+            head_ = (head_ + chunk) % data_.size();
+            used_ += chunk;
+            source += chunk;
+            size -= chunk;
+            cv_.notify_all();
+        }
+        return true;
+    }
+
+    std::size_t read(std::uint8_t* target, std::size_t size, const std::atomic<bool>& stop) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (used_ == 0 && !eof_ && !stop.load()) {
+            cv_.wait_for(lock, std::chrono::milliseconds(20));
+        }
+        if (used_ == 0) return 0;
+        const std::size_t chunk = std::min(size, used_);
+        const std::size_t first = std::min(chunk, data_.size() - tail_);
+        std::memcpy(target, data_.data() + tail_, first);
+        if (chunk > first) std::memcpy(target + first, data_.data(), chunk - first);
+        tail_ = (tail_ + chunk) % data_.size();
+        used_ -= chunk;
+        cv_.notify_all();
+        return chunk;
+    }
+
+    void finish() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        eof_ = true;
+        cv_.notify_all();
+    }
+
+private:
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    std::vector<std::uint8_t> data_;
+    std::size_t head_ = 0;
+    std::size_t tail_ = 0;
+    std::size_t used_ = 0;
+    bool eof_ = false;
+};
+
+struct HttpState {
+    explicit HttpState(std::shared_ptr<Task> owner) : task(std::move(owner)) {}
+    ByteRing ring{kHttpRingBytes};
+    std::shared_ptr<Task> task;
+    std::atomic<bool> stop{false};
+    std::atomic<bool> failed{false};
     std::mutex error_mutex;
     std::string error;
+    std::mutex prefix_mutex;
+    std::vector<std::uint8_t> prefix;
+    bool prefix_done = false;
+};
+
+struct HttpJob {
+    std::shared_ptr<HttpState> state;
 };
 
 hui::audio::StreamRing deck(1u << 15);
 hui::audio::Mixer* mixer = nullptr;
 std::mutex task_mutex;
+std::vector<std::shared_ptr<Task>> tasks;
 std::shared_ptr<Task> current;
 std::atomic<std::uint32_t> next_id{1};
 
@@ -54,84 +160,535 @@ const char* state_name(State state) {
     }
 }
 
-void fail(Task& task, const std::string& message) {
+void set_error(Task& task, const std::string& message) {
     {
-        std::lock_guard<std::mutex> lock(task.error_mutex);
+        std::lock_guard<std::mutex> lock(task.info_mutex);
         task.error = message;
     }
     task.state = State::failed;
-    ps4::system::log("music: %s failed: %s", task.path.c_str(), message.c_str());
+    ps4::system::log("music: %s failed: %s", task.source.c_str(), message.c_str());
 }
 
-void run(Task& task) {
-    mp3dec_t decoder{};
-    mp3dec_file_info_t info{};
-    const int opened = mp3dec_load(&decoder, task.path.c_str(), &info, nullptr, nullptr);
-    if (opened != 0 || !info.buffer || info.channels < 1 || info.hz <= 0) {
-        if (info.buffer) std::free(info.buffer);
-        fail(task, "cannot decode the MP3");
+std::uint32_t big_endian(const std::uint8_t* data) {
+    return (static_cast<std::uint32_t>(data[0]) << 24) |
+           (static_cast<std::uint32_t>(data[1]) << 16) |
+           (static_cast<std::uint32_t>(data[2]) << 8) | data[3];
+}
+
+std::uint32_t synchsafe(const std::uint8_t* data) {
+    return (static_cast<std::uint32_t>(data[0] & 0x7F) << 21) |
+           (static_cast<std::uint32_t>(data[1] & 0x7F) << 14) |
+           (static_cast<std::uint32_t>(data[2] & 0x7F) << 7) |
+           (static_cast<std::uint32_t>(data[3] & 0x7F));
+}
+
+void append_utf8(std::string& out, std::uint32_t cp) {
+    if (cp < 0x80) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+std::string decode_id3_text(const std::uint8_t* data, std::size_t size) {
+    if (size < 1) return {};
+    const std::uint8_t encoding = data[0];
+    const std::uint8_t* text = data + 1;
+    const std::size_t length = size - 1;
+    std::string out;
+    if (encoding == 0 || encoding == 3) {
+        for (std::size_t i = 0; i < length && text[i]; ++i) {
+            if (encoding == 0) {
+                append_utf8(out, text[i]);
+            } else {
+                out.push_back(static_cast<char>(text[i]));
+            }
+        }
+        return out;
+    }
+    if (encoding != 1 && encoding != 2) return out;
+    bool little = encoding == 1;
+    std::size_t i = 0;
+    if (encoding == 1 && length >= 2) {
+        if (text[0] == 0xFF && text[1] == 0xFE) {
+            little = true;
+            i = 2;
+        } else if (text[0] == 0xFE && text[1] == 0xFF) {
+            little = false;
+            i = 2;
+        }
+    }
+    while (i + 1 < length) {
+        const std::uint32_t unit = little
+                                       ? (static_cast<std::uint32_t>(text[i]) |
+                                          (static_cast<std::uint32_t>(text[i + 1]) << 8))
+                                       : ((static_cast<std::uint32_t>(text[i]) << 8) |
+                                          static_cast<std::uint32_t>(text[i + 1]));
+        i += 2;
+        if (unit == 0) break;
+        if (unit >= 0xD800 && unit <= 0xDBFF && i + 1 < length) {
+            const std::uint32_t low = little
+                                          ? (static_cast<std::uint32_t>(text[i]) |
+                                             (static_cast<std::uint32_t>(text[i + 1]) << 8))
+                                          : ((static_cast<std::uint32_t>(text[i]) << 8) |
+                                             static_cast<std::uint32_t>(text[i + 1]));
+            if (low >= 0xDC00 && low <= 0xDFFF) {
+                i += 2;
+                append_utf8(out, 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00));
+                continue;
+            }
+        }
+        append_utf8(out, unit);
+    }
+    return out;
+}
+
+bool parse_id3v2(const std::uint8_t* data, std::size_t size, Metadata& metadata) {
+    if (size < 10 || std::memcmp(data, "ID3", 3) != 0) return false;
+    const int version = data[3];
+    if (version < 2 || version > 4) return false;
+    const std::uint32_t tag_size = synchsafe(data + 6);
+    if (tag_size == 0 || tag_size + 10 > size) return false;
+    const std::uint8_t* at = data + 10;
+    const std::uint8_t* end = at + tag_size;
+    while (at + 10 <= end && at[0] != 0) {
+        char id[5] = {static_cast<char>(at[0]), static_cast<char>(at[1]),
+                      static_cast<char>(at[2]), static_cast<char>(at[3]), 0};
+        const std::uint32_t frame_size =
+            version == 4 ? synchsafe(at + 4) : big_endian(at + 4);
+        if (frame_size == 0 || at + 10 + frame_size > end) break;
+        const std::uint8_t* body = at + 10;
+        if (std::strcmp(id, "TIT2") == 0) metadata.title = decode_id3_text(body, frame_size);
+        else if (std::strcmp(id, "TPE1") == 0) metadata.artist = decode_id3_text(body, frame_size);
+        else if (std::strcmp(id, "TALB") == 0) metadata.album = decode_id3_text(body, frame_size);
+        at += 10 + frame_size;
+    }
+    return true;
+}
+
+void set_metadata(Task& task, const Metadata& metadata) {
+    std::lock_guard<std::mutex> lock(task.info_mutex);
+    if (!metadata.title.empty()) task.metadata.title = metadata.title;
+    if (!metadata.artist.empty()) task.metadata.artist = metadata.artist;
+    if (!metadata.album.empty()) task.metadata.album = metadata.album;
+}
+
+void read_local_metadata(Task& task) {
+    FILE* file = std::fopen(task.source.c_str(), "rb");
+    if (!file) return;
+    std::uint8_t header[10]{};
+    if (std::fread(header, 1, sizeof header, file) == sizeof header &&
+        std::memcmp(header, "ID3", 3) == 0) {
+        const std::uint32_t tag_size = synchsafe(header + 6);
+        if (tag_size > 0 && tag_size < kMetadataPrefixBytes) {
+            std::vector<std::uint8_t> tag(10 + tag_size);
+            std::memcpy(tag.data(), header, 10);
+            if (std::fread(tag.data() + 10, 1, tag_size, file) == tag_size) {
+                Metadata metadata;
+                if (parse_id3v2(tag.data(), tag.size(), metadata)) set_metadata(task, metadata);
+            }
+        }
+    }
+    std::fclose(file);
+}
+
+void update_http_metadata(HttpState& http) {
+    std::lock_guard<std::mutex> lock(http.prefix_mutex);
+    if (http.prefix_done) return;
+    if (http.prefix.size() < 10) return;
+    if (std::memcmp(http.prefix.data(), "ID3", 3) != 0) {
+        http.prefix_done = true;
+        http.prefix.clear();
         return;
     }
-    const std::uint64_t frames = info.samples / static_cast<std::uint64_t>(info.channels);
-    task.duration = info.hz > 0 ? frames / static_cast<std::uint64_t>(info.hz) : 0;
-    const std::uint64_t output_frames =
-        static_cast<std::uint64_t>(frames * 48000ull / static_cast<std::uint64_t>(info.hz));
-    ps4::system::log("music: %s %d Hz %d ch, %llu frames", task.path.c_str(), info.hz,
-                     info.channels, static_cast<unsigned long long>(frames));
+    const std::uint32_t tag_size = synchsafe(http.prefix.data() + 6);
+    if (tag_size == 0 || tag_size >= kMetadataPrefixBytes) {
+        http.prefix_done = true;
+        http.prefix.clear();
+        return;
+    }
+    if (http.prefix.size() < static_cast<std::size_t>(tag_size) + 10) return;
+    Metadata metadata;
+    if (parse_id3v2(http.prefix.data(), http.prefix.size(), metadata))
+        set_metadata(*http.task, metadata);
+    http.prefix_done = true;
+    http.prefix.clear();
+}
 
-    std::vector<float> buffer(2048 * 2);
-    std::uint64_t written = 0;
-    const double ratio = static_cast<double>(info.hz) / 48000.0;
-    while (!task.stop && written < output_frames) {
-        if (task.paused) {
+std::size_t http_write(char* data, std::size_t size, std::size_t count, void* user) {
+    auto* http = static_cast<HttpState*>(user);
+    const std::size_t bytes = size * count;
+    if (!bytes) return 0;
+    if (http->stop.load() || http->task->stop.load()) return 0;
+    {
+        std::lock_guard<std::mutex> lock(http->prefix_mutex);
+        if (!http->prefix_done && http->prefix.size() < kMetadataPrefixBytes) {
+            const std::size_t room = kMetadataPrefixBytes - http->prefix.size();
+            const std::size_t take = std::min(room, bytes);
+            http->prefix.insert(http->prefix.end(), data, data + take);
+        }
+    }
+    update_http_metadata(*http);
+    if (!http->ring.write(reinterpret_cast<const std::uint8_t*>(data), bytes, http->stop)) return 0;
+    return bytes;
+}
+
+int http_progress(void* user, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
+    auto* http = static_cast<HttpState*>(user);
+    return (http->stop.load() || http->task->stop.load()) ? 1 : 0;
+}
+
+void* http_entry(void* argument) {
+    std::unique_ptr<HttpJob> job(static_cast<HttpJob*>(argument));
+    HttpState& http = *job->state;
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        {
+            std::lock_guard<std::mutex> lock(http.error_mutex);
+            http.error = "cannot initialize HTTP";
+        }
+        http.failed = true;
+        http.ring.finish();
+        return nullptr;
+    }
+    if (!network::configure_transport(curl, http.task->source, true)) {
+        {
+            std::lock_guard<std::mutex> lock(http.error_mutex);
+            http.error = "cannot configure HTTP";
+        }
+        http.failed = true;
+        curl_easy_cleanup(curl);
+        http.ring.finish();
+        return nullptr;
+    }
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, http_write);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &http);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, http_progress);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &http);
+    curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 64L * 1024);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    ps4::system::log("music: GET %s", http.task->source.c_str());
+    const CURLcode result = curl_easy_perform(curl);
+    ps4::system::log("music: HTTP result=%d %s", static_cast<int>(result),
+                     curl_easy_strerror(result));
+    if (result != CURLE_OK && !http.stop.load() && !http.task->stop.load()) {
+        std::lock_guard<std::mutex> lock(http.error_mutex);
+        http.error = curl_easy_strerror(result);
+        http.failed = true;
+    }
+    curl_easy_cleanup(curl);
+    http.ring.finish();
+    return nullptr;
+}
+
+void start_http(const std::shared_ptr<HttpState>& http) {
+    auto* job = new HttpJob{http};
+    pthread_attr_t attributes;
+    pthread_t thread{};
+    bool started = false;
+    if (pthread_attr_init(&attributes) == 0) {
+        pthread_attr_setstacksize(&attributes, 2 * 1024 * 1024);
+        started = pthread_create(&thread, &attributes, http_entry, job) == 0;
+        pthread_attr_destroy(&attributes);
+    }
+    if (started) {
+        pthread_detach(thread);
+    } else {
+        delete job;
+        http->failed = true;
+        http->ring.finish();
+    }
+}
+
+void run_local(const std::shared_ptr<Task>& owner) {
+    Task& task = *owner;
+    mp3dec_ex_t decoder{};
+    const int opened = mp3dec_ex_open(&decoder, task.source.c_str(), MP3D_SEEK_TO_SAMPLE);
+    if (opened != 0) {
+        set_error(task, "cannot decode the MP3");
+        return;
+    }
+    read_local_metadata(task);
+
+    const int hz = decoder.info.hz;
+    const int channels = decoder.info.channels;
+    if (hz <= 0 || channels < 1) {
+        mp3dec_ex_close(&decoder);
+        set_error(task, "invalid MP3 stream");
+        return;
+    }
+    const std::uint64_t source_frames = decoder.samples;
+    {
+        std::lock_guard<std::mutex> lock(task.info_mutex);
+        task.duration = source_frames ? static_cast<double>(source_frames) / hz : 0.0;
+    }
+    ps4::system::log("music: %s %d Hz %d ch, %llu frames", task.source.c_str(), hz, channels,
+                     static_cast<unsigned long long>(source_frames));
+
+    std::vector<mp3d_sample_t> pcm(8192);
+    std::vector<mp3d_sample_t> pending;
+    std::uint64_t pending_base = 0;
+    double source_pos = 0.0;
+    const double ratio = static_cast<double>(hz) / 48000.0;
+    std::vector<float> output(kOutputFrames * 2);
+    bool eof = false;
+
+    while (!task.stop.load()) {
+        const std::uint64_t seek = task.seek_ms.exchange(kNoSeek);
+        if (seek != kNoSeek) {
+            std::uint64_t sample = seek * static_cast<std::uint64_t>(hz) / 1000;
+            if (source_frames && sample >= source_frames) sample = source_frames - 1;
+            if (mp3dec_ex_seek(&decoder, sample) == 0) {
+                pending.clear();
+                pending_base = sample;
+                source_pos = static_cast<double>(sample);
+                task.position = sample * 48000ull / static_cast<std::uint64_t>(hz);
+                eof = false;
+            } else {
+                ps4::system::log("music: seek to %llu ms failed", static_cast<unsigned long long>(seek));
+            }
+        }
+        if (task.paused.load()) {
             task.state = State::paused;
             ps4::system::sleep_us(20000);
             continue;
         }
         task.state = State::playing;
-        const std::size_t frames_to_mix = std::min<std::uint64_t>(1024, output_frames - written);
-        for (std::size_t i = 0; i < frames_to_mix; ++i) {
-            const double source = static_cast<double>(written + i) * ratio;
-            std::uint64_t index = static_cast<std::uint64_t>(source);
-            if (index + 1 >= frames) index = frames > 0 ? frames - 1 : 0;
-            const double fraction = source - static_cast<double>(index);
-            const std::uint64_t next = index + 1 < frames ? index + 1 : index;
-            const float left = static_cast<float>(info.buffer[index * info.channels]) / 32768.0f;
-            const float right = info.channels > 1
-                                    ? static_cast<float>(info.buffer[index * info.channels + 1]) / 32768.0f
-                                    : left;
-            const float next_left = static_cast<float>(info.buffer[next * info.channels]) / 32768.0f;
-            const float next_right = info.channels > 1
-                                         ? static_cast<float>(info.buffer[next * info.channels + 1]) / 32768.0f
-                                         : next_left;
-            buffer[i * 2] = left + (next_left - left) * static_cast<float>(fraction);
-            buffer[i * 2 + 1] = right + (next_right - right) * static_cast<float>(fraction);
-        }
-        std::size_t offset = 0;
-        while (offset < frames_to_mix && !task.stop) {
-            const std::size_t count = deck.write(buffer.data() + offset * 2, frames_to_mix - offset);
-            offset += count;
-            written += count;
-            task.position = written;
-            if (count == 0) {
-                if (task.paused) break;
-                ps4::system::sleep_us(10000);
+
+        if (!eof) {
+            const std::size_t got = mp3dec_ex_read(&decoder, pcm.data(), pcm.size());
+            if (got) {
+                pending.insert(pending.end(), pcm.begin(), pcm.begin() + got);
+            } else {
+                eof = true;
             }
         }
+
+        const std::uint64_t pending_end = pending_base + pending.size() / channels;
+        std::size_t produced = 0;
+        while (produced < kOutputFrames) {
+            const std::uint64_t index = static_cast<std::uint64_t>(std::floor(source_pos));
+            if (index >= pending_end) break;
+            if (!eof && index + 1 >= pending_end) break;
+            const double fraction = source_pos - static_cast<double>(index);
+            const std::size_t at = static_cast<std::size_t>(index - pending_base);
+            const std::size_t next = index + 1 < pending_end ? at + 1 : at;
+            const float left = static_cast<float>(pending[at * channels]) / 32768.0f;
+            const float right = channels > 1 ? static_cast<float>(pending[at * channels + 1]) / 32768.0f : left;
+            const float next_left = static_cast<float>(pending[next * channels]) / 32768.0f;
+            const float next_right =
+                channels > 1 ? static_cast<float>(pending[next * channels + 1]) / 32768.0f : next_left;
+            output[produced * 2] = left + (next_left - left) * static_cast<float>(fraction);
+            output[produced * 2 + 1] = right + (next_right - right) * static_cast<float>(fraction);
+            ++produced;
+            source_pos += ratio;
+        }
+
+        std::size_t offset = 0;
+        while (offset < produced && !task.stop.load()) {
+            const std::size_t written = deck.write(output.data() + offset * 2, produced - offset);
+            offset += written;
+            task.position += written;
+            if (!written) {
+                if (task.paused.load()) break;
+                ps4::system::sleep_us(5000);
+            }
+        }
+
+        const std::uint64_t keep = static_cast<std::uint64_t>(std::floor(source_pos));
+        if (keep > pending_base && pending.size() / channels > 16384) {
+            const std::size_t drop = static_cast<std::size_t>(keep - pending_base);
+            pending.erase(pending.begin(), pending.begin() + drop * channels);
+            pending_base += drop;
+        }
+        if (eof && produced == 0 && source_pos >= pending_end) break;
     }
-    std::free(info.buffer);
-    if (task.stop) {
+
+    mp3dec_ex_close(&decoder);
+    if (task.stop.load()) {
         task.state = State::stopped;
         return;
     }
     task.state = State::completed;
-    ps4::system::log("music: completed %s", task.path.c_str());
+    ps4::system::log("music: completed %s", task.source.c_str());
+}
+
+void run_remote(const std::shared_ptr<Task>& owner) {
+    Task& task = *owner;
+    auto http = std::make_shared<HttpState>(owner);
+    start_http(http);
+
+    mp3dec_t decoder{};
+    mp3dec_init(&decoder);
+    std::vector<std::uint8_t> input;
+    input.reserve(64 * 1024);
+    std::vector<mp3d_sample_t> pcm(MINIMP3_MAX_SAMPLES_PER_FRAME);
+    std::vector<mp3d_sample_t> pending;
+    std::vector<float> output(kOutputFrames * 2);
+    std::uint64_t pending_base = 0;
+    double source_pos = 0.0;
+    int hz = 0, channels = 0;
+    double ratio = 1.0;
+    bool eof = false;
+    bool id3_checked = false;
+    std::uint64_t skip_tag = 0;
+    bool seek_warned = false;
+
+    auto drain = [&](bool final) {
+        const std::uint64_t pending_end = pending_base + pending.size() / channels;
+        std::size_t produced = 0;
+        while (produced < kOutputFrames) {
+            const std::uint64_t index = static_cast<std::uint64_t>(std::floor(source_pos));
+            if (index >= pending_end) break;
+            if (!final && index + 1 >= pending_end) break;
+            const double fraction = source_pos - static_cast<double>(index);
+            const std::size_t at = static_cast<std::size_t>(index - pending_base);
+            const std::size_t next = index + 1 < pending_end ? at + 1 : at;
+            const float left = static_cast<float>(pending[at * channels]) / 32768.0f;
+            const float right = channels > 1 ? static_cast<float>(pending[at * channels + 1]) / 32768.0f : left;
+            const float next_left = static_cast<float>(pending[next * channels]) / 32768.0f;
+            const float next_right =
+                channels > 1 ? static_cast<float>(pending[next * channels + 1]) / 32768.0f : next_left;
+            output[produced * 2] = left + (next_left - left) * static_cast<float>(fraction);
+            output[produced * 2 + 1] = right + (next_right - right) * static_cast<float>(fraction);
+            ++produced;
+            source_pos += ratio;
+        }
+        std::size_t offset = 0;
+        while (offset < produced && !task.stop.load()) {
+            const std::size_t written = deck.write(output.data() + offset * 2, produced - offset);
+            offset += written;
+            task.position += written;
+            if (!written) {
+                if (task.paused.load()) break;
+                ps4::system::sleep_us(5000);
+            }
+        }
+        const std::uint64_t keep = static_cast<std::uint64_t>(std::floor(source_pos));
+        if (keep > pending_base && pending.size() / channels > 16384) {
+            const std::size_t drop = static_cast<std::size_t>(keep - pending_base);
+            pending.erase(pending.begin(), pending.begin() + drop * channels);
+            pending_base += drop;
+        }
+        return produced;
+    };
+
+    while (!task.stop.load()) {
+        const std::uint64_t seek = task.seek_ms.exchange(kNoSeek);
+        if (seek != kNoSeek && !seek_warned) {
+            ps4::system::log("music: seek is not supported on HTTP streams");
+            seek_warned = true;
+        }
+        if (task.paused.load()) {
+            task.state = State::paused;
+            ps4::system::sleep_us(20000);
+            continue;
+        }
+        task.state = State::playing;
+
+        if (!eof) {
+            std::uint8_t chunk[16384];
+            const std::size_t got = http->ring.read(chunk, sizeof chunk, http->stop);
+            if (got) {
+                input.insert(input.end(), chunk, chunk + got);
+            } else {
+                eof = true;
+            }
+        }
+
+        if (!id3_checked && input.size() >= 10) {
+            if (input[0] == 'I' && input[1] == 'D' && input[2] == '3') {
+                skip_tag = static_cast<std::uint64_t>(synchsafe(input.data() + 6)) + 10;
+            }
+            id3_checked = true;
+        }
+        if (skip_tag) {
+            const std::size_t drop = static_cast<std::size_t>(std::min<std::uint64_t>(skip_tag, input.size()));
+            input.erase(input.begin(), input.begin() + drop);
+            skip_tag -= drop;
+            if (skip_tag) {
+                if (eof) break;
+                continue;
+            }
+        }
+
+        bool consumed = false;
+        while (input.size() >= 4) {
+            mp3dec_frame_info_t info{};
+            const int samples = mp3dec_decode_frame(&decoder, input.data(), static_cast<int>(input.size()),
+                                                    pcm.data(), &info);
+            if (info.frame_bytes <= 0) break;
+            input.erase(input.begin(), input.begin() + info.frame_bytes);
+            consumed = true;
+            if (samples <= 0) continue;
+            if (hz == 0) {
+                hz = info.hz;
+                channels = info.channels;
+                if (hz <= 0 || channels < 1) {
+                    set_error(task, "invalid MP3 stream");
+                    http->stop = true;
+                    http->ring.finish();
+                    return;
+                }
+                ratio = static_cast<double>(hz) / 48000.0;
+                ps4::system::log("music: %s %d Hz %d ch (stream)", task.source.c_str(), hz, channels);
+            }
+            if (info.channels != channels || info.hz != hz) continue;
+            pending.insert(pending.end(), pcm.begin(), pcm.begin() + samples * channels);
+            drain(false);
+        }
+
+        if (eof) {
+            if (hz) drain(true);
+            break;
+        }
+        if (!consumed && input.size() > 256 * 1024) {
+            input.erase(input.begin(), input.begin() + 128 * 1024);
+            ps4::system::log("music: skipping unreadable stream data");
+        }
+    }
+
+    http->stop = true;
+    http->ring.finish();
+    if (task.stop.load()) {
+        task.state = State::stopped;
+        return;
+    }
+    if (http->failed.load()) {
+        std::lock_guard<std::mutex> lock(http->error_mutex);
+        set_error(task, http->error.empty() ? "HTTP stream failed" : http->error);
+        return;
+    }
+    if (hz == 0) {
+        set_error(task, "not an MP3 stream");
+        return;
+    }
+    task.state = State::completed;
+    ps4::system::log("music: completed %s", task.source.c_str());
+}
+
+void run(const std::shared_ptr<Task>& owner) {
+    owner->running = true;
+    if (owner->remote) run_remote(owner);
+    else run_local(owner);
+    owner->running = false;
 }
 
 void* entry(void* value) {
     std::unique_ptr<std::shared_ptr<Task>> task(
         static_cast<std::shared_ptr<Task>*>(value));
-    run(**task);
+    run(*task);
     return nullptr;
 }
 
@@ -149,35 +706,61 @@ void start(const std::shared_ptr<Task>& task) {
         pthread_detach(thread);
     } else {
         delete argument;
-        fail(*task, "cannot start the music thread");
+        set_error(*task, "cannot start the music thread");
     }
+}
+
+std::shared_ptr<Task> find_task(std::uint32_t id) {
+    std::lock_guard<std::mutex> lock(task_mutex);
+    for (const auto& task : tasks)
+        if (task->id == id) return task;
+    return {};
+}
+
+bool starts_with(const std::string& value, const char* prefix) {
+    const std::size_t length = std::strlen(prefix);
+    return value.size() >= length && value.compare(0, length, prefix) == 0;
 }
 
 JSValue play(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (argc < 1 || !JS_IsString(argv[0]))
-        return JS_ThrowTypeError(ctx, "Music.play: expected a path");
+        return JS_ThrowTypeError(ctx, "Music.play: expected a path or URL");
     std::size_t length = 0;
     const char* input = JS_ToCStringLen(ctx, &length, argv[0]);
     if (!input) return JS_EXCEPTION;
-    char path[PATH_MAX];
-    const bool allowed = length && length < PATH_MAX && !std::memchr(input, 0, length) &&
-                         host::resolve_path(input, path, sizeof path);
+    std::string source(input, length);
     JS_FreeCString(ctx, input);
-    if (!allowed) return JS_ThrowTypeError(ctx, "Music.play: path is not allowed");
+    if (source.empty() || source.size() > 2048 || source.find('\0') != std::string::npos)
+        return JS_ThrowTypeError(ctx, "Music.play: invalid path or URL");
+    const bool remote = starts_with(source, "http://") || starts_with(source, "https://");
+    char path[PATH_MAX];
+    if (!remote) {
+        if (source.size() >= PATH_MAX || !host::resolve_path(source.c_str(), path, sizeof path))
+            return JS_ThrowTypeError(ctx, "Music.play: path is not allowed");
+    }
     double volume = 1;
     if (argc > 1 && JS_ToFloat64(ctx, &volume, argv[1])) return JS_EXCEPTION;
     volume = std::clamp(volume, 0.0, 1.0);
 
     auto task = std::make_shared<Task>();
     task->id = next_id++;
-    task->path = path;
+    task->source = remote ? source : path;
+    task->remote = remote;
+
+    std::shared_ptr<Task> previous;
     {
         std::lock_guard<std::mutex> lock(task_mutex);
         if (current) {
+            previous = current;
             current->stop = true;
             current->state = State::stopped;
         }
+        tasks.push_back(task);
+        if (tasks.size() > 8) tasks.erase(tasks.begin());
         current = task;
+    }
+    if (previous) {
+        for (int i = 0; i < 400 && previous->running.load(); ++i) ps4::system::sleep_us(5000);
     }
     deck.drain();
     if (mixer) {
@@ -200,9 +783,9 @@ JSValue pause(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     std::uint32_t id = 0;
     if (!argc || JS_ToUint32(ctx, &id, argv[0]))
         return JS_ThrowTypeError(ctx, "Music.pause: expected a task id");
-    std::lock_guard<std::mutex> lock(task_mutex);
-    if (current && current->id == id) {
-        current->paused = true;
+    const auto task = find_task(id);
+    if (task) {
+        task->paused = true;
         if (mixer) mixer->set_stream_gain(0, 0, 0.1f);
     }
     return JS_UNDEFINED;
@@ -212,9 +795,9 @@ JSValue resume(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     std::uint32_t id = 0;
     if (!argc || JS_ToUint32(ctx, &id, argv[0]))
         return JS_ThrowTypeError(ctx, "Music.resume: expected a task id");
-    std::lock_guard<std::mutex> lock(task_mutex);
-    if (current && current->id == id) {
-        current->paused = false;
+    const auto task = find_task(id);
+    if (task) {
+        task->paused = false;
         if (mixer) mixer->set_stream_gain(0, 1, 0.1f);
     }
     return JS_UNDEFINED;
@@ -224,12 +807,26 @@ JSValue stop(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     std::uint32_t id = 0;
     if (!argc || JS_ToUint32(ctx, &id, argv[0]))
         return JS_ThrowTypeError(ctx, "Music.stop: expected a task id");
-    std::lock_guard<std::mutex> lock(task_mutex);
-    if (current && current->id == id) {
-        current->stop = true;
-        current->state = State::stopped;
+    const auto task = find_task(id);
+    if (task) {
+        task->stop = true;
+        task->state = State::stopped;
         deck.drain();
         if (mixer) mixer->set_stream_gain(0, 0, 0);
+    }
+    return JS_UNDEFINED;
+}
+
+JSValue seek(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    std::uint32_t id = 0;
+    double seconds = 0;
+    if (argc < 2 || JS_ToUint32(ctx, &id, argv[0]) || JS_ToFloat64(ctx, &seconds, argv[1]))
+        return JS_ThrowTypeError(ctx, "Music.seek: expected a task id and seconds");
+    const auto task = find_task(id);
+    if (task && !task->remote) {
+        const double clamped = std::max(0.0, seconds);
+        task->seek_ms = static_cast<std::uint64_t>(clamped * 1000.0);
+        deck.drain();
     }
     return JS_UNDEFINED;
 }
@@ -239,17 +836,21 @@ JSValue status(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (!argc || JS_ToUint32(ctx, &id, argv[0]))
         return JS_ThrowTypeError(ctx, "Music.status: expected a task id");
     JSValue out = JS_NewObject(ctx);
-    std::lock_guard<std::mutex> lock(task_mutex);
-    if (!current || current->id != id) {
+    const auto task = find_task(id);
+    if (!task) {
         JS_SetPropertyStr(ctx, out, "state", JS_NewString(ctx, "unknown"));
         JS_SetPropertyStr(ctx, out, "error", JS_NewString(ctx, "unknown music task"));
         return out;
     }
-    JS_SetPropertyStr(ctx, out, "state", JS_NewString(ctx, state_name(current->state)));
-    JS_SetPropertyStr(ctx, out, "position", JS_NewFloat64(ctx, current->position / 48000.0));
-    JS_SetPropertyStr(ctx, out, "duration", JS_NewFloat64(ctx, current->duration));
-    std::lock_guard<std::mutex> error_lock(current->error_mutex);
-    JS_SetPropertyStr(ctx, out, "error", JS_NewString(ctx, current->error.c_str()));
+    JS_SetPropertyStr(ctx, out, "state", JS_NewString(ctx, state_name(task->state)));
+    JS_SetPropertyStr(ctx, out, "position", JS_NewFloat64(ctx, task->position / 48000.0));
+    JS_SetPropertyStr(ctx, out, "seekable", JS_NewBool(ctx, !task->remote));
+    std::lock_guard<std::mutex> lock(task->info_mutex);
+    JS_SetPropertyStr(ctx, out, "duration", JS_NewFloat64(ctx, task->duration));
+    JS_SetPropertyStr(ctx, out, "title", JS_NewString(ctx, task->metadata.title.c_str()));
+    JS_SetPropertyStr(ctx, out, "artist", JS_NewString(ctx, task->metadata.artist.c_str()));
+    JS_SetPropertyStr(ctx, out, "album", JS_NewString(ctx, task->metadata.album.c_str()));
+    JS_SetPropertyStr(ctx, out, "error", JS_NewString(ctx, task->error.c_str()));
     return out;
 }
 
@@ -267,6 +868,7 @@ JSValue ps4_react_music_api(JSContext* ctx) {
     JS_SetPropertyStr(ctx, api, "pause", JS_NewCFunction(ctx, pause, "pause", 1));
     JS_SetPropertyStr(ctx, api, "resume", JS_NewCFunction(ctx, resume, "resume", 1));
     JS_SetPropertyStr(ctx, api, "stop", JS_NewCFunction(ctx, stop, "stop", 1));
+    JS_SetPropertyStr(ctx, api, "seek", JS_NewCFunction(ctx, seek, "seek", 2));
     JS_SetPropertyStr(ctx, api, "setVolume", JS_NewCFunction(ctx, set_volume, "setVolume", 1));
     JS_SetPropertyStr(ctx, api, "status", JS_NewCFunction(ctx, status, "status", 1));
     return api;
