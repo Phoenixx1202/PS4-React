@@ -40,6 +40,7 @@ constexpr std::uint64_t kNoSeek = std::numeric_limits<std::uint64_t>::max();
 constexpr std::size_t kHttpRingBytes = 1u << 20;
 constexpr std::size_t kMetadataPrefixBytes = 512u << 10;
 constexpr std::size_t kOutputFrames = 2048;
+constexpr int kCrossfadeMs = 1500;
 
 enum class State : int { playing, paused, completed, failed, stopped };
 
@@ -53,12 +54,16 @@ struct Task {
     std::uint32_t id = 0;
     std::string source;
     bool remote = false;
+    int slot = 0;
+    hui::audio::StreamRing* deck = nullptr;
+    float volume = 1.0f;
     std::atomic<State> state{State::playing};
     std::atomic<bool> stop{false};
     std::atomic<bool> paused{false};
     std::atomic<bool> running{false};
     std::atomic<std::uint64_t> position{0};  // output frames at 48 kHz
     std::atomic<std::uint64_t> seek_ms{kNoSeek};
+    std::atomic<std::int64_t> fade_deadline_ms{0};
     std::mutex info_mutex;
     double duration = 0;
     Metadata metadata;
@@ -130,6 +135,8 @@ struct HttpState {
     explicit HttpState(std::shared_ptr<Task> owner) : task(std::move(owner)) {}
     ByteRing ring{kHttpRingBytes};
     std::shared_ptr<Task> task;
+    CURL* curl = nullptr;
+    std::atomic<long long> content_length{-1};
     std::atomic<bool> stop{false};
     std::atomic<bool> failed{false};
     std::mutex error_mutex;
@@ -143,12 +150,24 @@ struct HttpJob {
     std::shared_ptr<HttpState> state;
 };
 
-hui::audio::StreamRing deck(1u << 15);
+hui::audio::StreamRing deck_a(1u << 15);
+hui::audio::StreamRing deck_b(1u << 15);
 hui::audio::Mixer* mixer = nullptr;
 std::mutex task_mutex;
 std::vector<std::shared_ptr<Task>> tasks;
 std::shared_ptr<Task> current;
 std::atomic<std::uint32_t> next_id{1};
+
+std::int64_t now_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
+bool faded_out(const Task& task) {
+    const std::int64_t deadline = task.fade_deadline_ms.load();
+    return deadline != 0 && now_ms() >= deadline;
+}
 
 const char* state_name(State state) {
     switch (state) {
@@ -330,6 +349,12 @@ std::size_t http_write(char* data, std::size_t size, std::size_t count, void* us
     const std::size_t bytes = size * count;
     if (!bytes) return 0;
     if (http->stop.load() || http->task->stop.load()) return 0;
+    if (http->curl && http->content_length.load() < 0) {
+        curl_off_t length = 0;
+        if (curl_easy_getinfo(http->curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &length) == CURLE_OK &&
+            length > 0)
+            http->content_length = static_cast<long long>(length);
+    }
     {
         std::lock_guard<std::mutex> lock(http->prefix_mutex);
         if (!http->prefix_done && http->prefix.size() < kMetadataPrefixBytes) {
@@ -378,14 +403,16 @@ void* http_entry(void* argument) {
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &http);
     curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 64L * 1024);
     curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    http.curl = curl;
     ps4::system::log("music: GET %s", http.task->source.c_str());
     const CURLcode result = curl_easy_perform(curl);
-    ps4::system::log("music: HTTP result=%d %s", static_cast<int>(result),
-                     curl_easy_strerror(result));
+    http.curl = nullptr;
     if (result != CURLE_OK && !http.stop.load() && !http.task->stop.load()) {
         std::lock_guard<std::mutex> lock(http.error_mutex);
         http.error = curl_easy_strerror(result);
         http.failed = true;
+        ps4::system::log("music: HTTP failed result=%d %s", static_cast<int>(result),
+                         http.error.c_str());
     }
     curl_easy_cleanup(curl);
     http.ring.finish();
@@ -445,6 +472,11 @@ void run_local(const std::shared_ptr<Task>& owner) {
     bool eof = false;
 
     while (!task.stop.load()) {
+        if (faded_out(task)) {
+            task.stop = true;
+            task.state = State::stopped;
+            break;
+        }
         const std::uint64_t seek = task.seek_ms.exchange(kNoSeek);
         if (seek != kNoSeek) {
             std::uint64_t sample = seek * static_cast<std::uint64_t>(hz) / 1000;
@@ -496,8 +528,8 @@ void run_local(const std::shared_ptr<Task>& owner) {
         }
 
         std::size_t offset = 0;
-        while (offset < produced && !task.stop.load()) {
-            const std::size_t written = deck.write(output.data() + offset * 2, produced - offset);
+        while (offset < produced && !task.stop.load() && !faded_out(task)) {
+            const std::size_t written = task.deck->write(output.data() + offset * 2, produced - offset);
             offset += written;
             task.position += written;
             if (!written) {
@@ -566,8 +598,8 @@ void run_remote(const std::shared_ptr<Task>& owner) {
             source_pos += ratio;
         }
         std::size_t offset = 0;
-        while (offset < produced && !task.stop.load()) {
-            const std::size_t written = deck.write(output.data() + offset * 2, produced - offset);
+        while (offset < produced && !task.stop.load() && !faded_out(task)) {
+            const std::size_t written = task.deck->write(output.data() + offset * 2, produced - offset);
             offset += written;
             task.position += written;
             if (!written) {
@@ -585,6 +617,11 @@ void run_remote(const std::shared_ptr<Task>& owner) {
     };
 
     while (!task.stop.load()) {
+        if (faded_out(task)) {
+            task.stop = true;
+            task.state = State::stopped;
+            break;
+        }
         const std::uint64_t seek = task.seek_ms.exchange(kNoSeek);
         if (seek != kNoSeek && !seek_warned) {
             ps4::system::log("music: seek is not supported on HTTP streams");
@@ -642,6 +679,14 @@ void run_remote(const std::shared_ptr<Task>& owner) {
                     return;
                 }
                 ratio = static_cast<double>(hz) / 48000.0;
+                if (info.bitrate_kbps > 0) {
+                    const long long length = http->content_length.load();
+                    if (length > 0) {
+                        std::lock_guard<std::mutex> lock(task.info_mutex);
+                        task.duration =
+                            static_cast<double>(length) * 8.0 / (info.bitrate_kbps * 1000.0);
+                    }
+                }
                 ps4::system::log("music: %s %d Hz %d ch (stream)", task.source.c_str(), hz, channels);
             }
             if (info.channels != channels || info.hz != hz) continue;
@@ -746,26 +791,58 @@ JSValue play(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     task->id = next_id++;
     task->source = remote ? source : path;
     task->remote = remote;
+    task->volume = static_cast<float>(volume);
 
     std::shared_ptr<Task> previous;
+    int slot = 0;
     {
         std::lock_guard<std::mutex> lock(task_mutex);
-        if (current) {
-            previous = current;
-            current->stop = true;
-            current->state = State::stopped;
-        }
+        previous = current;
+        slot = previous ? (previous->slot == 0 ? 2 : 0) : 0;
+        task->slot = slot;
+        task->deck = slot == 0 ? &deck_a : &deck_b;
         tasks.push_back(task);
         if (tasks.size() > 8) tasks.erase(tasks.begin());
         current = task;
     }
-    if (previous) {
-        for (int i = 0; i < 400 && previous->running.load(); ++i) ps4::system::sleep_us(5000);
+
+    // Stop any older task still fading on the slot we are about to reuse.
+    std::shared_ptr<Task> stale;
+    {
+        std::lock_guard<std::mutex> lock(task_mutex);
+        for (const auto& candidate : tasks) {
+            if (candidate != task && candidate != previous && candidate->slot == slot &&
+                candidate->running.load()) {
+                stale = candidate;
+                stale->stop = true;
+                break;
+            }
+        }
     }
-    deck.drain();
+    if (stale) {
+        for (int i = 0; i < 400 && stale->running.load(); ++i) ps4::system::sleep_us(5000);
+        stale->deck->drain();
+    }
+    task->deck->drain();
+
+    const bool fading = previous && previous->running.load() &&
+                        previous->state.load() == State::playing;
     if (mixer) {
-        mixer->set_stream_gain(0, 0, 0);
-        mixer->set_stream_gain(0, static_cast<float>(volume), 0.2f);
+        mixer->set_stream_gain(static_cast<std::size_t>(slot), 0, 0);
+        if (fading) {
+            previous->fade_deadline_ms = now_ms() + kCrossfadeMs;
+            mixer->set_stream_gain(static_cast<std::size_t>(previous->slot), 0,
+                                   kCrossfadeMs / 1000.0f);
+            mixer->set_stream_gain(static_cast<std::size_t>(slot), static_cast<float>(volume),
+                                   kCrossfadeMs / 1000.0f);
+        } else {
+            if (previous) {
+                previous->stop = true;
+                previous->state = State::stopped;
+                previous->deck->drain();
+            }
+            mixer->set_stream_gain(static_cast<std::size_t>(slot), static_cast<float>(volume), 0.05f);
+        }
     }
     start(task);
     return JS_NewUint32(ctx, task->id);
@@ -775,7 +852,14 @@ JSValue set_volume(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (!argc) return JS_ThrowTypeError(ctx, "Music.setVolume: expected a volume");
     double volume = 1;
     if (JS_ToFloat64(ctx, &volume, argv[0])) return JS_EXCEPTION;
-    if (mixer) mixer->set_stream_gain(0, static_cast<float>(std::clamp(volume, 0.0, 1.0)), 0.1f);
+    const float level = static_cast<float>(std::clamp(volume, 0.0, 1.0));
+    std::shared_ptr<Task> active;
+    {
+        std::lock_guard<std::mutex> lock(task_mutex);
+        active = current;
+    }
+    if (active) active->volume = level;
+    if (mixer && active) mixer->set_stream_gain(static_cast<std::size_t>(active->slot), level, 0.1f);
     return JS_UNDEFINED;
 }
 
@@ -786,7 +870,7 @@ JSValue pause(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     const auto task = find_task(id);
     if (task) {
         task->paused = true;
-        if (mixer) mixer->set_stream_gain(0, 0, 0.1f);
+        if (mixer) mixer->set_stream_gain(static_cast<std::size_t>(task->slot), 0, 0.1f);
     }
     return JS_UNDEFINED;
 }
@@ -798,7 +882,7 @@ JSValue resume(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     const auto task = find_task(id);
     if (task) {
         task->paused = false;
-        if (mixer) mixer->set_stream_gain(0, 1, 0.1f);
+        if (mixer) mixer->set_stream_gain(static_cast<std::size_t>(task->slot), task->volume, 0.1f);
     }
     return JS_UNDEFINED;
 }
@@ -811,8 +895,8 @@ JSValue stop(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (task) {
         task->stop = true;
         task->state = State::stopped;
-        deck.drain();
-        if (mixer) mixer->set_stream_gain(0, 0, 0);
+        task->deck->drain();
+        if (mixer) mixer->set_stream_gain(static_cast<std::size_t>(task->slot), 0, 0);
     }
     return JS_UNDEFINED;
 }
@@ -826,7 +910,7 @@ JSValue seek(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     if (task && !task->remote) {
         const double clamped = std::max(0.0, seconds);
         task->seek_ms = static_cast<std::uint64_t>(clamped * 1000.0);
-        deck.drain();
+        task->deck->drain();
     }
     return JS_UNDEFINED;
 }
@@ -858,8 +942,10 @@ JSValue status(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
 
 void ps4_react_music_attach(hui::audio::Mixer& target) {
     mixer = &target;
-    target.attach_stream(0, &deck);
+    target.attach_stream(0, &deck_a);
+    target.attach_stream(2, &deck_b);
     target.set_stream_gain(0, 0, 0);
+    target.set_stream_gain(2, 0, 0);
 }
 
 JSValue ps4_react_music_api(JSContext* ctx) {

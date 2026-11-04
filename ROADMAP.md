@@ -204,14 +204,16 @@ Validado no hardware; o log recomeça do zero após o relaunch.
   faixa inteira) e validada no hardware. `seek` funciona em arquivo local;
   stream HTTP ainda não aceita seek;
 - [x] playlists no sample (`Previous`/`Next`/auto-avanço) e metadados ID3
-  (`title`/`artist`/`album`) no status; capa ainda pendente. Crossfade com os
-  dois decks e BGM do sistema continuam pendentes;
-- [ ] crossfade usando os dois decks e o `stream_ring` do mixer;
+  (`title`/`artist`/`album`) no status; capa ainda pendente. Crossfade de 1,5 s
+  com dois decks de música e o terceiro stream do mixer validado no hardware;
+- [x] crossfade usando os dois decks e o `stream_ring` do mixer: música A no
+  stream 0, áudio de vídeo no 1 e música B no 2; a playlist inicia a próxima
+  faixa antes do fim do arquivo local e troca manual também sobrepõe;
 - [ ] BGM do sistema (`sceMusicPlayerService`) quando disponível;
 - [x] sample `music` (MP3 local e HTTP validados no hardware).
 
 **Aceite:** tocar MP3 local e stream HTTP com crossfade, sem underrun e com
-CPU baixa. MP3 local e stream HTTP validados; OGG/Opus e crossfade pendentes.
+CPU baixa. MP3 local, stream HTTP e crossfade validados; OGG/Opus pendentes.
 
 ### 2.2 Vídeo
 
@@ -541,6 +543,14 @@ firmware/GoldHEN:
   `mp3dec_ex_open_cb` exige fonte seekable e varre o stream. Metadados ID3
   (`SoundHelix`) e playlist com Previous/Next/auto-avanço no sample. Crossfade,
   OGG/Opus, capa e BGM do sistema pendentes. Sem push.
+- 2026-11-03 - crossfade de música validado no hardware (sample music, PKG
+  `1781637946dfa9f96eda37b7e2b3425d13dd01509386fa4f2921ac6cdb675c9c`): o mixer
+  passou a ter três streams (música A = 0, áudio de vídeo = 1, música B = 2),
+  cada faixa usa seu deck e a anterior cai em 1,5 s enquanto a nova sobe; a
+  playlist dispara a próxima antes do fim do arquivo local. O log mostrou duas
+  trocas locais e a entrada do HTTP sem erro; o abort do GET antigo deixou de
+  ser registrado como falha. Duração do HTTP estimada por Content-Length +
+  bitrate. OGG/Opus, capa e BGM do sistema pendentes. Sem push.
 ```
 
 ## Changelog do plano

@@ -64,7 +64,7 @@ class Mixer
   public:
     static constexpr std::size_t kVoices = 32;
     static constexpr std::size_t kQueue = 256;
-    static constexpr std::size_t kStreams = 2;     // music decks, for crossfades
+    static constexpr std::size_t kStreams = 3;     // music A, video, music B (crossfades)
     static constexpr std::size_t kMaxGrain = 1024; // frames per render call
 
     Mixer();

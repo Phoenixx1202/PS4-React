@@ -67,7 +67,8 @@ function App() {
       try {
         const next = track.status();
         setStatus(next);
-        if (next.state === 'completed' && !skippingRef.current) {
+        const nearEnd = next.duration > 2 && next.position >= next.duration - 1.6;
+        if (!skippingRef.current && (next.state === 'completed' || nearEnd)) {
           skippingRef.current = true;
           playIndex((indexRef.current + 1) % TRACKS.length);
           setTimeout(() => { skippingRef.current = false; }, 750);
