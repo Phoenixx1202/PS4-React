@@ -141,9 +141,11 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 
 - [ ] `Fonts.load(path/url)` para TTF/OTF em runtime;
 - [ ] fallback de fontes (lista de famílias e glifos ausentes);
-- [ ] validar shaping Indic no hardware;
-- [x] documentar fontes empacotadas versus carregadas em `docs/TEXT.md` (JP, SC e
-  árabe validados no hardware no build Vulkan; Indic pendente).
+- [x] validar shaping Indic no hardware: hindi e bengali renderizados no sample
+  `text` com subsets Noto, junto de japonês, chinês e árabe; ordem RTL e
+  parágrafo longo conferidos no hardware;
+- [x] documentar fontes empacotadas versus carregadas em `docs/TEXT.md` (JP, SC,
+  árabe e Indic validados no hardware no sample `text`);
 
 ### 1.7 Multi-controle e multi-usuário
 
@@ -184,7 +186,9 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 - [x] `audio` (Sound.play) — sample com WAV empacotado validado;
 - [x] `downloads` (progresso/cancelar/retomar) — sample validado;
 - [x] `archive` (extrair/criar) — ZIP criar/inspecionar/extrair validado;
-- [ ] `text` (CJK/árabe/Indic)
+- [x] `text` (CJK/árabe/Indic) - sample com subsets Noto empacotados em
+  `fonts/`, parágrafo longo e ordem RTL; validado no hardware (PKG
+  `750d1ab986fdcafb96f633323057dff2d399693f2dd4f7d73a4d75e3b1182b2e`);
 - [x] `device` (DeviceInfo/Users/Notifications) — validado, incluindo
   temperatura via `libkernel_sys` e memória flexível disponível;
 - [ ] `gallery` (imagens + ScrollView)
@@ -516,6 +520,14 @@ firmware/GoldHEN:
   fontes Noto completas). Commit local `7663e06`; sem push. O projeto CMake
   Vulkan ainda é um spike em `.build`; falta torná-lo um alvo opt-in do repo e
   substituir as fontes completas por subsets no empacotamento.
+- 2026-11-03 - sample `text` validado no hardware (PKG
+  `750d1ab986fdcafb96f633323057dff2d399693f2dd4f7d73a4d75e3b1182b2e`): japonês,
+  chinês, árabe, hindi e bengali com subsets Noto (~180 KB no total), fontes
+  copiadas automaticamente de `fonts/` para `/app0/fonts`, parágrafo longo
+  completo e ordem RTL conferida pelos runs (`267-275` antes de `197-209`).
+  O limite de 255 bytes por nó cortava o parágrafo; o patch
+  `patches/embeddedReact-text-size.patch` eleva para 1023 bytes (768 bytes por
+  nó, ~0,4 MB com `ER_MAX_NODES=512`). Sem push.
 ```
 
 ## Changelog do plano

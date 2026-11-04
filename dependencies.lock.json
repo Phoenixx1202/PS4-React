@@ -27,7 +27,8 @@
                                           "patches/embeddedReact-european-glyphs.patch",
                                           "patches/embeddedReact-text-shaper.patch",
                                           "patches/embeddedReact-text-direction.patch",
-                                          "patches/embeddedReact-text-clip.patch"
+                                          "patches/embeddedReact-text-clip.patch",
+                                          "patches/embeddedReact-text-size.patch"
                                       ]
                       },
     "quickjs":  {

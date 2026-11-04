@@ -64,6 +64,15 @@ pyftsubset NotoSansJP-Regular.otf --output-file=fonts/NotoSansJP-Regular.otf \
 O shaper não depende do nome da família: ele escolhe o arquivo pelo script
 predominante do trecho de texto.
 
+## Limite de texto por nó
+
+O engine guarda o texto de cada nó num buffer inline de `ER_TEXT_MAX` bytes. O
+valor original de 255 cortava parágrafos longos antes de chegar ao shaper; o
+patch `patches/embeddedReact-text-size.patch` eleva o limite para 1023 bytes
+(UTF-8, incluindo o terminador). Textos maiores devem ser divididos em mais de
+um nó `<Text>`. O custo é de 768 bytes por nó de texto, cerca de 0,4 MB no total
+com `ER_MAX_NODES=512`.
+
 ## Idioma
 
 `text_shaper::set_language("ja")` faz o han preferir os glifos japoneses; sem a
@@ -72,8 +81,10 @@ para isso; o padrão atual é chinês para han e japonês para kana.
 
 ## Estado validado
 
-- 2026-11-03: japonês, chinês e árabe renderizados no hardware no build
-  Vulkan/RADV com o shaper real (HarfBuzz + SheenBidi + `hb-raster`, libc++21).
-- Indic está implementado, mas ainda sem validação no hardware.
+- 2026-11-03: japonês, chinês, árabe, hindi e bengali renderizados no hardware
+  no sample `text` (build OpenOrbis); o parágrafo longo completa e o árabe
+  aparece na ordem RTL correta.
+- Indic está implementado e validado no sample; falta apenas testar variantes
+  de fonte que o app não empacote.
 - Texto latino continua usando as fontes baked; o shaper só entra quando falta
   glifo ou o script exige shaping/reordenação.

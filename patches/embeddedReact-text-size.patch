@@ -1,0 +1,19 @@
+diff --git a/engine/include/er_scene.h b/engine/include/er_scene.h
+--- a/engine/include/er_scene.h
++++ b/engine/include/er_scene.h
+@@ -56,8 +56,13 @@
+ #define ER_DEG2RAD 0.017453292519943295f
+ #define ER_RAD2DEG 57.29577951308232f
+ 
+-/** @brief Maximum length of ERProps::text, excluding the null terminator. */
+-#define ER_TEXT_MAX 255
++/**
++ * Maximum length of ERProps::text, excluding the null terminator. Long
++ * paragraphs need more than the original 255 bytes; text nodes store the
++ * buffer inline, so this trades a few hundred KB across ER_MAX_NODES for
++ * full-length paragraphs without a heap allocation.
++ */
++#define ER_TEXT_MAX 1023
+ 
+ /** @brief Maximum length of ERProps::font_family, excluding the null terminator. */
+ #define ER_FONT_FAMILY_MAX 31
