@@ -22,6 +22,19 @@ if (-not (Test-Path $lockPath)) { throw "Missing lock file: $lockPath" }
 if (-not (Test-Path $marker)) { throw "Not an Embedded React checkout: $ErRoot" }
 
 if (Select-String -Path $marker -Pattern 'er_image_unload' -Quiet) {
+    # The text-size patch was added after the original stack. Existing
+    # checkouts already carry the old patches, so apply only the new one when
+    # the buffer still has the old limit.
+    if (Select-String -Path $marker -Pattern '#define ER_TEXT_MAX 255' -Quiet) {
+        $sizePatch = Join-Path $root 'patches\embeddedReact-text-size.patch'
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        git -C $ErRoot apply --ignore-whitespace $sizePatch
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $previous
+        if ($code -ne 0) { throw 'Failed to apply patches\embeddedReact-text-size.patch' }
+        Write-Host 'applied patches\embeddedReact-text-size.patch'
+    }
     Write-Host 'Embedded React patches already applied.'
     return
 }
