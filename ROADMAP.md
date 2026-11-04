@@ -205,9 +205,9 @@ Validado no hardware; o log recomeça do zero após o relaunch.
   a faixa inteira) e validada no hardware. `seek` funciona em arquivo local
   MP3/OGG; stream HTTP ainda não aceita seek;
 - [x] playlists no sample (`Previous`/`Next`/auto-avanço) e metadados ID3
-  (`title`/`artist`/`album`) no status; capa de álbum MP3 (APIC) decodificada,
-  registrada no engine e exibida no sample. Capa em OGG (`METADATA_BLOCK_PICTURE`)
-  ainda pendente; crossfade de 1,5 s com dois decks validado no hardware;
+  (`title`/`artist`/`album`) no status; capa de álbum MP3 (APIC) e OGG Vorbis
+  (`METADATA_BLOCK_PICTURE`) decodificadas, registradas no engine e exibidas no
+  sample. Crossfade de 1,5 s com dois decks validado no hardware;
 - [x] crossfade usando os dois decks e o `stream_ring` do mixer: música A no
   stream 0, áudio de vídeo no 1 e música B no 2; a playlist inicia a próxima
   faixa antes do fim do arquivo local e troca manual também sobrepõe;
@@ -568,6 +568,14 @@ firmware/GoldHEN:
   registrado no engine como `@music:<id>`; o `<Image source={cover}>` do sample
   exibe a capa 220×220. O `music.mp3` de teste ganhou TIT2/TALB e uma capa
   320×320. Capa em OGG, Opus e BGM do sistema pendentes. Sem push.
+- 2026-11-03 - capa OGG validada no hardware (sample music, PKG
+  `aa9b91fb09ce075b6af55eeab2f49fbfe2f8b2167b7ee249066d1a64d7e7ba18`): o
+  `METADATA_BLOCK_PICTURE` dos comentários Vorbis é decodificado de base64,
+  interpretado como FLAC Picture e registrado no engine; `COVERART` serve de
+  fallback e as chaves são comparadas sem diferenciar maiúsculas/minúsculas
+  (o mutagen grava em minúsculas). O `music.ogg` de teste ganhou capa e
+  TITLE/ARTIST/ALBUM; local e HTTP exibem a mesma arte do MP3. Opus e BGM do
+  sistema pendentes. Sem push.
 ```
 
 ## Changelog do plano

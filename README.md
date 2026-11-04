@@ -32,8 +32,8 @@ The default build produces a single installable package:
 - **Server-Sent Events** through `Sse.connect` with bounded event queues.
 - **WebSocket** text client (`ws://`/`wss://`) with polling, ping/pong and close.
 - **Music** playback: MP3 and OGG Vorbis decoding, 48 kHz resampling, local
-  files and HTTP(S) streams, ID3/Vorbis metadata, MP3 album art, playlists and
-  crossfade on the mixer's two music decks.
+  files and HTTP(S) streams, ID3/Vorbis metadata, MP3/OGG album art, playlists
+  and crossfade on the mixer's two music decks.
 - **Video** playback through `sceAvPlayer` (local MP4/H.264 + AAC, NV12 with
   pitch/crop, ARGB blit at 30 fps for 480p, audio through the mixer on a
   dedicated thread). 720p/1080p and the GPU texture path are pending.

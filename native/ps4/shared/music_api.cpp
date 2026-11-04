@@ -391,22 +391,90 @@ bool local_vorbis(const std::string& path) {
     return ogg;
 }
 
+int base64_value(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+std::vector<std::uint8_t> base64_decode(const std::string& text) {
+    std::vector<std::uint8_t> out;
+    std::uint32_t value = 0;
+    int bits = -8;
+    for (char c : text) {
+        if (c == '=') break;
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+        const int digit = base64_value(c);
+        if (digit < 0) return {};
+        value = (value << 6) | static_cast<std::uint32_t>(digit);
+        bits += 6;
+        if (bits >= 0) {
+            out.push_back(static_cast<std::uint8_t>((value >> bits) & 0xFF));
+            bits -= 8;
+            if (out.size() > 4u * 1024 * 1024) return {};
+        }
+    }
+    return out;
+}
+
+bool parse_picture_block(const std::vector<std::uint8_t>& block, std::vector<std::uint8_t>& cover) {
+    std::size_t at = 0;
+    auto read32 = [&](std::uint32_t& value) {
+        if (at + 4 > block.size()) return false;
+        value = (static_cast<std::uint32_t>(block[at]) << 24) |
+                (static_cast<std::uint32_t>(block[at + 1]) << 16) |
+                (static_cast<std::uint32_t>(block[at + 2]) << 8) | block[at + 3];
+        at += 4;
+        return true;
+    };
+    std::uint32_t type = 0, mime_length = 0, description_length = 0;
+    std::uint32_t width = 0, height = 0, depth = 0, colors = 0, data_length = 0;
+    if (!read32(type) || !read32(mime_length) || at + mime_length > block.size()) return false;
+    at += mime_length;
+    if (!read32(description_length) || at + description_length > block.size()) return false;
+    at += description_length;
+    if (!read32(width) || !read32(height) || !read32(depth) || !read32(colors) ||
+        !read32(data_length))
+        return false;
+    if (data_length == 0 || data_length > 4u * 1024 * 1024 || at + data_length > block.size())
+        return false;
+    cover.assign(block.begin() + static_cast<std::ptrdiff_t>(at),
+                 block.begin() + static_cast<std::ptrdiff_t>(at + data_length));
+    return true;
+}
+
 void vorbis_metadata(stb_vorbis* vorbis, Task& task) {
     const stb_vorbis_comment comments = stb_vorbis_get_comment(vorbis);
     Metadata metadata;
+    std::vector<std::uint8_t> cover;
     for (int i = 0; i < comments.comment_list_length; ++i) {
         const char* entry = comments.comment_list[i];
         if (!entry) continue;
         const char* equals = std::strchr(entry, '=');
         if (!equals) continue;
         const std::string key(entry, equals);
+        std::string upper = key;
+        for (char& c : upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
         const char* value = equals + 1;
-        if (key == "TITLE") metadata.title = value;
-        else if (key == "ARTIST") metadata.artist = value;
-        else if (key == "ALBUM") metadata.album = value;
+        if (upper == "TITLE") metadata.title = value;
+        else if (upper == "ARTIST") metadata.artist = value;
+        else if (upper == "ALBUM") metadata.album = value;
+        else if (upper == "METADATA_BLOCK_PICTURE" && cover.empty()) {
+            const std::vector<std::uint8_t> block = base64_decode(value);
+            parse_picture_block(block, cover);
+        } else if (upper == "COVERART" && cover.empty()) {
+            cover = base64_decode(value);
+        }
     }
     if (!metadata.title.empty() || !metadata.artist.empty() || !metadata.album.empty())
         set_metadata(task, metadata);
+    if (!cover.empty()) {
+        std::lock_guard<std::mutex> lock(task.info_mutex);
+        task.cover = std::move(cover);
+    }
 }
 
 std::string ensure_cover(Task& task) {
