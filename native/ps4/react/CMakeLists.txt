@@ -210,6 +210,19 @@ if(COMMAND add_self)
         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ps4_react_starter.oelf")
 
     set(PS4_REACT_APP_DIR "${CMAKE_BINARY_DIR}/app-react")
+    # Apps may ship runtime fonts for CJK/Arabic/Indic under fonts/; the bundler
+    # stages the whole app in PS4_REACT_GENERATED_DIR/app.
+    set(PS4_REACT_STAGE_FONTS)
+    if(EXISTS "${PS4_REACT_GENERATED_DIR}/app/fonts")
+        set(PS4_REACT_STAGE_FONTS
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${PS4_REACT_APP_DIR}/fonts"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                    "${PS4_REACT_GENERATED_DIR}/app/fonts" "${PS4_REACT_APP_DIR}/fonts")
+    else()
+        # Drop fonts left over from a previous app so they are not packaged.
+        set(PS4_REACT_STAGE_FONTS
+            COMMAND "${CMAKE_COMMAND}" -E remove_directory "${PS4_REACT_APP_DIR}/fonts")
+    endif()
     add_custom_target(ps4_react_starter_stage ALL
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${PS4_REACT_APP_DIR}/sce_module"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -223,6 +236,7 @@ if(COMMAND add_self)
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
                 "${CMAKE_SOURCE_DIR}/assets/ca-bundle.crt"
                 "${PS4_REACT_APP_DIR}/ca-bundle.crt"
+        ${PS4_REACT_STAGE_FONTS}
         DEPENDS ps4_react_starter_self
         COMMENT "Staging the React launch folder in ${PS4_REACT_APP_DIR}"
         VERBATIM)

@@ -142,7 +142,8 @@ Validado no hardware; o log recomeça do zero após o relaunch.
 - [ ] `Fonts.load(path/url)` para TTF/OTF em runtime;
 - [ ] fallback de fontes (lista de famílias e glifos ausentes);
 - [ ] validar shaping Indic no hardware;
-- [ ] documentar fontes empacotadas versus carregadas.
+- [x] documentar fontes empacotadas versus carregadas em `docs/TEXT.md` (JP, SC e
+  árabe validados no hardware no build Vulkan; Indic pendente).
 
 ### 1.7 Multi-controle e multi-usuário
 
@@ -293,8 +294,9 @@ silenciosa. Validado no hardware; a auditoria formal fica pendente.
 - [x] runtime React completo (engine, QuickJS, bridge e APIs nativas) no
   toolchain PS4SX2 (clang-21/libc++21 + Mesa/RADV), com a UI apresentada por
   textura Vulkan 1080p em dois buffers de scanout alternados; validado no
-  hardware com 2256 frames a 59,9 fps e sem falhas de `present`. O shaper de
-  texto desse build ainda é um stub (latim funciona pelas fontes baked);
+  hardware com 2256 frames a 59,9 fps e sem falhas de `present`. O mesmo build
+  usa o text shaper real (HarfBuzz + SheenBidi + `hb-raster` compilados com
+  libc++21); japonês, chinês e árabe foram validados no hardware;
 - [ ] atlas de textura, batching, scissor, blend e shaders para a UI 2D;
   bloqueado com os shaders pré-compilados da Sony: `texmap/v_0`, `v_1` e `v_2`
   derivam a UV da posição do vértice via `u_textureSpaceMatrix`, então cada
@@ -502,6 +504,18 @@ firmware/GoldHEN:
   A integração com o runtime React ainda precisa do toolchain PS4SX2
   (libc++21/Mesa) ou de um PRX Vulkan; 720p/1080p, 4K/HDR e UI na GPU continuam
   pendentes. Sem push.
+- 2026-11-03 - runtime React completo no toolchain PS4SX2 (clang-21/libc++21 +
+  Mesa/RADV): UI 1080p60 apresentada como textura Vulkan em dois buffers de
+  scanout alternados (PKG
+  `8007799c6575f21768a048053f6d3a8b9930d37edb0afd825a4e71f6fe4fcdc7`), vídeo
+  NV12 composto como texturas Y/UV no fragment shader sem conversão na CPU, com
+  cores, posição, pause/seek/stop e saída limpa validados. O mesmo build linka
+  HarfBuzz + SheenBidi + `hb-raster` com libc++21 e renderizou japonês, chinês e
+  árabe no hardware (PKG de teste
+  `d19d02c43e7394bd31415ffffeb4b6d3a9f35df4ccfc966439c48c640a94a87b`, com
+  fontes Noto completas). Commit local `7663e06`; sem push. O projeto CMake
+  Vulkan ainda é um spike em `.build`; falta torná-lo um alvo opt-in do repo e
+  substituir as fontes completas por subsets no empacotamento.
 ```
 
 ## Changelog do plano
