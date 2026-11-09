@@ -16,10 +16,15 @@ OUTPUT="${8:-$PROJECT/build/PS4-React-Starter.pkg}"
 VERSION="${9:-01.00}"
 OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
 
-mkdir -p "$ROOTFS/mnt/c" "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys"
-if ! mountpoint -q "$ROOTFS/mnt/c"; then
-    mount --bind /mnt/c "$ROOTFS/mnt/c"
-fi
+for WINDOWS_MOUNT in /mnt/c /mnt/d; do
+    if [ -d "$WINDOWS_MOUNT" ]; then
+        mkdir -p "$ROOTFS$WINDOWS_MOUNT"
+        if ! mountpoint -q "$ROOTFS$WINDOWS_MOUNT"; then
+            mount --bind "$WINDOWS_MOUNT" "$ROOTFS$WINDOWS_MOUNT"
+        fi
+    fi
+done
+mkdir -p "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys"
 # The .NET-based PkgTool.Core resolves /proc/self/exe; mount proc before chroot.
 mountpoint -q "$ROOTFS/proc" || mount -t proc proc "$ROOTFS/proc"
 mountpoint -q "$ROOTFS/dev" || mount --rbind /dev "$ROOTFS/dev"

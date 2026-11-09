@@ -68,7 +68,7 @@ function To-WslPath([string]$WindowsPath) {
     $code = $LASTEXITCODE
     $ErrorActionPreference = $previous
     if ($code -ne 0) { throw "Cannot resolve $WindowsPath in WSL" }
-    if ($value.StartsWith("$Rootfs/mnt/c/")) {
+    if ($value.StartsWith("$Rootfs/mnt/")) {
         $value = $value.Substring($Rootfs.Length)
     }
     return $value
@@ -76,8 +76,8 @@ function To-WslPath([string]$WindowsPath) {
 
 $ProjectPath = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $ProjectUnix = To-WslPath $ProjectPath
-if (-not $ProjectUnix.StartsWith('/mnt/c/')) {
-    throw "The project must live on C: (got $ProjectUnix); the rootfs bind-mounts /mnt/c."
+if (-not $ProjectUnix.StartsWith('/mnt/')) {
+    throw "The project must live on a Windows drive mounted in WSL (got $ProjectUnix)."
 }
 
 $AppRelative = 'app'

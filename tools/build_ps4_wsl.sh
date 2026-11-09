@@ -34,12 +34,18 @@ if [ -z "$ER_ROOT" ] || [ -z "$QUICKJS_ROOT" ]; then
     exit 2
 fi
 
-# The project lives on C:, which the chroot only sees after this bind mount.
-mkdir -p "$ROOTFS/mnt/c" "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys"
-if ! mountpoint -q "$ROOTFS/mnt/c"; then
-    mount --bind /mnt/c "$ROOTFS/mnt/c"
-fi
+# The project and dependencies may live on any Windows drive. Bind every
+# mounted drive so the chroot sees the same /mnt/<drive> paths.
+for WINDOWS_MOUNT in /mnt/c /mnt/d; do
+    if [ -d "$WINDOWS_MOUNT" ]; then
+        mkdir -p "$ROOTFS$WINDOWS_MOUNT"
+        if ! mountpoint -q "$ROOTFS$WINDOWS_MOUNT"; then
+            mount --bind "$WINDOWS_MOUNT" "$ROOTFS$WINDOWS_MOUNT"
+        fi
+    fi
+done
 # PkgTool.Core (and some build tools) need the usual kernel filesystems.
+mkdir -p "$ROOTFS/proc" "$ROOTFS/dev" "$ROOTFS/sys"
 mountpoint -q "$ROOTFS/proc" || mount -t proc proc "$ROOTFS/proc"
 mountpoint -q "$ROOTFS/dev" || mount --rbind /dev "$ROOTFS/dev"
 mountpoint -q "$ROOTFS/sys" || mount --rbind /sys "$ROOTFS/sys"
